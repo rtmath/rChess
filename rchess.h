@@ -71,8 +71,21 @@ struct big_texture {
   byte Pixels[Kilobytes(200)];
 };
   
+struct board {
+  bool32 WhiteToMove;
+  bool32 wCanCastleKingside;
+  bool32 wCanCastleQueenside;
+  bool32 bCanCastleKingside;
+  bool32 bCanCastleQueenside;
+  uint8 EnPassantTarget;
+  uint8 HalfMoves;
+  uint8 FullMoves; // according to Chess.com, only one game (Nikolic vs Arsovic 1989) exceeded the max value of a uint8 (269 moves). Anyone who plays a game of equivalent length on this engine will be sad.
+  piece Squares[64]; // 0..63 | A1, A2, .., H7, H8 | Little Endian Rank File mapping
+};
+
 struct chess_state {
-  big_texture Board;
+  board Board;
+  big_texture BoardTexture;
   texture BlackBishop;
   texture BlackKing;
   texture BlackKnight;
