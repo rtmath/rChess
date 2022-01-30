@@ -51,19 +51,17 @@ inline uint8 AsciiN(char c) {
   return c - '0';
 };
 
-void PopulateBoardFromFEN(board* Board, char* FEN, int* fendex) {
+void PopulateBitboardFromFEN(bitboard* Bitboards, char* FEN, int* fendex) {
   char c = FEN[*fendex];
 
-  int board_index = 56;
+  int square = A8;
   while (c > 0) {
     if (IsPiece(c)) {
-      Board->Squares[board_index++] = PieceFromFEN(c);
+      SetBit(&Bitboards[PieceFromFEN(c)], square++);
     } else if (IsNum(c)) {
-      for (uint8 i = 0; i < AsciiN(c); i++) {
-        Board->Squares[board_index++] = EMPTY;
-      };
+      for (uint8 i = 0; i < AsciiN(c); i++) { square++; }
     }  else if (c == '/') {
-      board_index -= 16; // Go to next row on board
+      square -= 16; // Go to next row on board
     } else {
       (*fendex)++; // Move the FEN index over the whitespace
       break;
@@ -72,33 +70,29 @@ void PopulateBoardFromFEN(board* Board, char* FEN, int* fendex) {
   };
 };
 
-void SideToMoveFromFEN(board* Board, char* FEN, int* fendex) {
+void SideToMoveFromFEN(board_state* Board, char* FEN, int* fendex) {
   char c = FEN[(*fendex)];
   (*fendex)+=2; // Skip current position and whitespace
   if (c == 'b') { Board->WhiteToMove = false; }
   else { Board->WhiteToMove = true; }
 };
 
-void CastlingAvailabilityFromFEN(board* Board, char* FEN, int* fendex) {
+void CastlingAvailabilityFromFEN(board_state* Board, char* FEN, int* fendex) {
   char c = FEN[(*fendex)];
   while (c != '-' && c != ' ' && c != '\0') {
     switch(c) {
     case 'K': {
       Board->wCanCastleKingside = true;
-      break;
-    }
+    } break;
     case 'Q': {
        Board->wCanCastleQueenside = true;
-      break;
-    }
+    } break;
     case 'k': {
       Board->bCanCastleKingside = true;
-      break;
-    }
+    } break;
     case 'q': {
       Board->bCanCastleQueenside = true;
-      break;
-    }
+    } break;
     default: {
       break;
     }
@@ -108,7 +102,7 @@ void CastlingAvailabilityFromFEN(board* Board, char* FEN, int* fendex) {
   (*fendex)++;
 };
 
-void EnPassantFromFEN(board* Board, char* FEN, int* fendex) {
+void EnPassantFromFEN(board_state* Board, char* FEN, int* fendex) {
   char c = FEN[(*fendex)];
   if (c == '-') {
     Board->EnPassantTarget = 0; // This clashes with the index of the A1 square, but EP isnt possible on A1
@@ -157,14 +151,27 @@ void MoveCountFromFEN(uint8* board_move_counter, char* FEN, int* fendex) {
   (*fendex)++; // Skip whitespace
 };
 
-void FENToBoard(char* FEN, board* Board) {
+void FENToBitboards(char* FEN, bitboard* Bitboards, board_state* BoardState) {
   int index = 0;
-  PopulateBoardFromFEN(Board, FEN, &index);
-  SideToMoveFromFEN(Board, FEN, &index);
-  CastlingAvailabilityFromFEN(Board, FEN, &index);
-  EnPassantFromFEN(Board, FEN, &index);
-  MoveCountFromFEN(&Board->HalfMoves, FEN, &index);
-  MoveCountFromFEN(&Board->FullMoves, FEN, &index);
+  PopulateBitboardFromFEN(Bitboards, FEN, &index);
+  SideToMoveFromFEN(BoardState, FEN, &index);
+  CastlingAvailabilityFromFEN(BoardState, FEN, &index);
+  EnPassantFromFEN(BoardState, FEN, &index);
+  MoveCountFromFEN(&BoardState->HalfMoves, FEN, &index);
+  MoveCountFromFEN(&BoardState->FullMoves, FEN, &index);
+  Bitboards[OCCUP_SQ] = (Bitboards[wPAWN] |
+			 Bitboards[wBISHOP] |
+			 Bitboards[wKNIGHT] |
+			 Bitboards[wROOK] |
+			 Bitboards[wQUEEN] |
+			 Bitboards[wKING] |
+                         Bitboards[bPAWN] |
+			 Bitboards[bBISHOP] |
+			 Bitboards[bKNIGHT] |
+			 Bitboards[bROOK] |
+			 Bitboards[bQUEEN] |
+			 Bitboards[bKING]);
+  Bitboards[EMPTY_SQ] = ~(Bitboards[OCCUP_SQ]);
 };
 
 #define FEN_H

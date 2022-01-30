@@ -12,7 +12,7 @@
 
 struct read_file_result {
   uint32 ContentsSize;
-  void* Contents;
+  void*  Contents;
 };
 
 #define PLATFORM_FREE_FILE_MEMORY(name) void name(void* Memory)
@@ -59,6 +59,22 @@ struct back_buffer {
   int BytesPerPixel;
 };
 
+struct pixel_values {
+  int TotalTexture;  // size in one dimension (256x256 = 256)
+  int InnerPadding;  // No. pixels until actual board begins
+  int PieceTexture;  // size in one dimension (20x20 = 20)
+  int BoardSquare;   // size in one dimension (22x22 = 22)
+  int SquarePadding; // No. pixels to offset pieces when drawing the board
+  int CenteredX;     // The leftmost X value when the texture is centered
+};
+
+struct dims {
+  int MinX;
+  int MinY;
+  int MaxX;
+  int MaxY;
+};
+
 struct texture {
   int  Width;
   int  Height;
@@ -66,12 +82,12 @@ struct texture {
 };
 
 struct big_texture {
-  int Width;
-  int Height;
+  int  Width;
+  int  Height;
   byte Pixels[Kilobytes(200)];
 };
-  
-struct board {
+
+struct board_state {
   bool32 WhiteToMove;
   bool32 wCanCastleKingside;
   bool32 wCanCastleQueenside;
@@ -80,24 +96,29 @@ struct board {
   uint8 EnPassantTarget;
   uint8 HalfMoves;
   uint8 FullMoves; // according to Chess.com, only one game (Nikolic vs Arsovic 1989) exceeded the max value of a uint8 (269 moves). Anyone who plays a game of equivalent length on this engine will be sad.
+};
+
+struct mailbox {
   piece Squares[64]; // 0..63 | A1, A2, .., H7, H8 | Little Endian Rank File mapping
 };
 
 struct chess_state {
-  board Board;
-  big_texture BoardTexture;
-  texture BlackBishop;
-  texture BlackKing;
-  texture BlackKnight;
-  texture BlackPawn;
-  texture BlackQueen;
-  texture BlackRook;
-  texture WhiteBishop;
-  texture WhiteKing;
-  texture WhiteKnight;
-  texture WhitePawn;
-  texture WhiteQueen;
-  texture WhiteRook;
+  bitboard Bitboards[16];
+  board_state BoardState;
+  mailbox Mailbox;
+
+  // Input
+  bool32 DragMode;
+  piece DraggedPiece;
+  int DraggedPieceOrigin;
+  bitboard DraggedPieceLegalMoves;
+  
+  // GUI
+  big_texture  BoardTex;
+  dims         BoardTexDims;
+  pixel_values BoardTexPxVals;
+  texture Pieces[16];
+  int TextureScale;
 };
 
 #define RCHESS_H

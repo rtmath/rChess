@@ -81,6 +81,7 @@ DrawTexture(back_buffer* Buffer, big_texture Texture,
 		      (uint32)(red   << 16)| // Red
 		      (uint32)(blue  << 8) | // Green
 		      (uint32)(green));      // Blue
+      if (color == ALPHA_MASK) { *Pixel++; continue; }
       *Pixel++ = color;
     }
     tex_x = -1;
@@ -102,15 +103,12 @@ DrawTexture(back_buffer* Buffer, big_texture Texture,
   DrawTexture(Buffer, Texture, PosX, PosY, ScaleXY, ScaleXY);
 }
 
-// This is hardcoded for the specific Board and Piece textures I am using.
-// The Board texture is 256x256 pixels and each piece is 20x20 pixels
-// The actual board in the texture is only 176x176, and the other pixels are decoration
-void DrawPieces(back_buffer* Buffer, chess_state* State, board* Board, int scale) {
-  int board_texture_dims = 256 * scale;
-  int inner_texture_padding = (board_texture_dims - (176 * scale)) / 2;
-  int piece_texture_dims = 20 * scale;
-  int square_dims = 22 * scale;
-  int padding = (square_dims - piece_texture_dims) / 2;
+void DrawPieces(back_buffer* Buffer, chess_state* State, mailbox* Board, int Scale) {
+  int board_texture_dims    = State->BoardTexPxVals.TotalTexture;
+  int inner_texture_padding = State->BoardTexPxVals.InnerPadding;
+  int piece_texture_dims    = State->BoardTexPxVals.PieceTexture;
+  int square_dims           = State->BoardTexPxVals.BoardSquare;
+  int padding               = State->BoardTexPxVals.SquarePadding;
 
   int starting_x = (Buffer->Width / 2) - (board_texture_dims / 2) + inner_texture_padding;
   int starting_y = board_texture_dims - inner_texture_padding - square_dims;
@@ -119,49 +117,105 @@ void DrawPieces(back_buffer* Buffer, chess_state* State, board* Board, int scale
     for (int col = 0; col < 8; col++) {
       int pos_x = starting_x + (col * square_dims) + padding;
       int pos_y = starting_y - (row * square_dims) + padding;
-      switch(Board->Squares[(row * 8) + col]) {
+      int piece = Board->Squares[(row * 8) + col];
+      switch(piece) {
       case EMPTY:
+      case OCCUP_SQ:
+      case EMPTY_SQ:
+      case UNUSED:
 	continue;
-      case wPAWN:
-	DrawTexture(Buffer, State->WhitePawn, pos_x, pos_y, scale);
+      default:
+	DrawTexture(Buffer, State->Pieces[piece], pos_x, pos_y, Scale);
 	break;
-      case bPAWN:
-	DrawTexture(Buffer, State->BlackPawn, pos_x, pos_y, scale);
-	break;
-      case wBISHOP:
-	DrawTexture(Buffer, State->WhiteBishop, pos_x, pos_y, scale);
-	break;
-      case bBISHOP:
-	DrawTexture(Buffer, State->BlackBishop, pos_x, pos_y, scale);
-	break;
-      case wKNIGHT:
-	DrawTexture(Buffer, State->WhiteKnight, pos_x, pos_y, scale);
-	break;
-      case bKNIGHT:
-	DrawTexture(Buffer, State->BlackKnight, pos_x, pos_y, scale);
-	break;
-      case wROOK:
-	DrawTexture(Buffer, State->WhiteRook, pos_x, pos_y, scale);
-	break;
-      case bROOK:
-	DrawTexture(Buffer, State->BlackRook, pos_x, pos_y, scale);
-	break;
-      case wQUEEN:
-	DrawTexture(Buffer, State->WhiteQueen, pos_x, pos_y, scale);
-	break;
-      case bQUEEN:
-	DrawTexture(Buffer, State->BlackQueen, pos_x, pos_y, scale);
-	break;
-      case wKING:
-	DrawTexture(Buffer, State->WhiteKing, pos_x, pos_y, scale);
-	break;
-      case bKING:
-	DrawTexture(Buffer, State->BlackKing, pos_x, pos_y, scale);
-	break;
-      }      
+      }
     }
   }
 };
+
+
+void DrawPiece(back_buffer* Buffer, chess_state* State, piece Piece, int X, int Y, int Scale) {
+  switch(Piece) {
+  case EMPTY:
+  case OCCUP_SQ:
+  case EMPTY_SQ:
+  case UNUSED:
+    return;
+  default:
+    DrawTexture(Buffer, State->Pieces[Piece], X, Y, Scale);
+    return;
+  }
+}
+
+internal void
+DrawRectangle(back_buffer* Buffer,
+	      int32 MinX, int32 MinY, int32 MaxX, int32 MaxY, uint32 Color) {
+  if (MinX < 0) { MinX = 0; }
+  if (MinY < 0) { MinY = 0; }
+  if (MaxX > Buffer->Width) { MaxX = Buffer->Width; }
+  if (MaxY > Buffer->Height) { MaxY = Buffer->Height; }
+
+  uint8* Row = ((uint8*)Buffer->Memory +
+		(MinX * Buffer->BytesPerPixel) +
+		(MinY * Buffer->Pitch));
+  
+  for (int y = MinY; y < MaxY; ++y) {
+    uint32* Pixel = (uint32*)Row;
+    for (int x = MinX; x < MaxX; ++x) {
+      *Pixel++ = Color;
+    }
+
+    Row += Buffer->Pitch;
+  }
+}
+
+void ClearScreen(back_buffer* Buffer, uint32 Color) {
+  DrawRectangle(Buffer, 0, 0, Buffer->Width, Buffer->Height, Color);
+};
+
+void DrawSquareOverlay(back_buffer* Buffer, bitboard ShouldDrawOverlay, int Scale, int Color) {
+  int board_texture_dims = 256 * Scale;
+  int inner_texture_padding = (board_texture_dims - (176 * Scale)) / 2;
+  int piece_texture_dims = 20 * Scale;
+  int square_dims = 22 * Scale;
+  int padding = (square_dims - piece_texture_dims) / 2;
+
+  int starting_x = (Buffer->Width / 2) - (board_texture_dims / 2) + inner_texture_padding;
+  int starting_y = board_texture_dims - inner_texture_padding - square_dims;
+
+  int i = 0;
+  for (int row = 0; row < 8; row++) {
+    for (int col = 0; col < 8; col++) {
+      int pos_x = starting_x + (col * square_dims);
+      int pos_y = starting_y - (row * square_dims);
+      if (ShouldDrawOverlay & 0x1ULL) {
+	DrawRectangle(Buffer, pos_x, pos_y, pos_x + square_dims - padding, pos_y + square_dims - padding, Color);
+      }
+      ShouldDrawOverlay >>= 1;
+    }
+  }
+}
+
+void DrawSquareOverlay(back_buffer* Buffer, mailbox Mailbox, int Scale, int Color) {
+  int board_texture_dims = 256 * Scale;
+  int inner_texture_padding = (board_texture_dims - (176 * Scale)) / 2;
+  int piece_texture_dims = 20 * Scale;
+  int square_dims = 22 * Scale;
+  int padding = (square_dims - piece_texture_dims) / 2;
+
+  int starting_x = (Buffer->Width / 2) - (board_texture_dims / 2) + inner_texture_padding;
+  int starting_y = board_texture_dims - inner_texture_padding - square_dims;
+
+  int i = 0;
+  for (int row = 0; row < 8; row++) {
+    for (int col = 0; col < 8; col++) {
+      int pos_x = starting_x + (col * square_dims);
+      int pos_y = starting_y - (row * square_dims);
+      if (Mailbox.Squares[i++]) {
+	DrawRectangle(Buffer, pos_x, pos_y, pos_x + square_dims - padding, pos_y + square_dims - padding, Color);
+      }
+    }
+  }
+}
 
 #define GRAPHICS_H
 #endif

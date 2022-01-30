@@ -2,7 +2,7 @@
 
 #include "../fen.h"
 
-void PrintBoard(board B, char* Name) {
+void PrintBoardState(board_state B, char* Name) {
   printf("|| %s\n", Name);
   printf("  WhiteToMove: %s\n", (B.WhiteToMove) ? "true" : "false");
   printf("  wCanCastleKingside: %u\n", B.wCanCastleKingside);
@@ -12,14 +12,9 @@ void PrintBoard(board B, char* Name) {
   printf("  EnPassant Target Square index: %u\n", B.EnPassantTarget);
   printf("  Half Moves: %i\n", B.HalfMoves);
   printf("  Full Moves: %i\n", B.FullMoves);
-  printf("  I'm not printing squares here unless I need to.\n");
 };
 
-void PrintBoard(board B) {
-  PrintBoard(B, "Board");
-}
-
-bool32 Equal(board A, board B) {
+bool32 Equal(board_state A, board_state B) {
   if ((A.WhiteToMove != B.WhiteToMove) ||
       (A.wCanCastleKingside != B.wCanCastleKingside) ||
       (A.wCanCastleQueenside != B.wCanCastleQueenside) ||
@@ -30,40 +25,26 @@ bool32 Equal(board A, board B) {
       (A.FullMoves != B.FullMoves)) {
     return false;
   }
-  for (int i = 0; i < 64; i++) {
-    if (A.Squares[i] != B.Squares[i]) {
-      return false;
-    }
-  }
   return true;
 };
 
 bool32 TEST_Equal() {
   bool32 result = true;
-  board B = {};
+  board_state B = {};
 
   if (!Equal(B, B)) {
     printf("TEST_Equal FAILED! Same board != itself\n");
     result = false;
   }
 
-  board X = {};
-  board Y = {};
+  board_state X = {};
+  board_state Y = {};
   X.HalfMoves = 20;
   if (Equal(X, Y)) {
     printf("TEST_Equal FAILED! Differing boards are passing compare test\n");
     result = false;
   }
-
-  for (int i = 0; i < 64; i++) {
-    X.Squares[i] = i % 6;
-    Y.Squares[i] = i % 7;
-  }
-  if (Equal(X, Y)) {
-    printf("TEST_Equal FAILED! Boards with different squares are passing compare test\n");
-    result = false;
-  };
-
+  
   return result;
 };
 
@@ -79,50 +60,53 @@ bool32 TEST_PopulateBoardFromFEN() {
     bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN,
     bROOK, bKNIGHT, bBISHOP, bQUEEN, bKING, bBISHOP, bKNIGHT, bROOK
   };
-  board Expected = {};
-  for (int i = 0; i < 64; i++) { Expected.Squares[i] = ExpectedPieces[i]; }
+  bitboard Expected[16] = {};
+  for (int i = 0; i < 64; i++) { SetBitboard(Expected, ExpectedPieces[i], i); }
   
-  board Actual = {};
+  bitboard Actual[16] = {};
+  
   int fendex = 0;
-  PopulateBoardFromFEN(&Actual, starting_FEN, &fendex);
+  PopulateBitboardFromFEN(&Actual[0], starting_FEN, &fendex);
 
   bool32 result = true;
-  for (int i = 0; i < 64; i++) {
-    if (Expected.Squares[i] != Actual.Squares[i]) {
+  for (int i = 0; i < 16; i++) {
+    if (Expected[i] != Actual[i]) {
       result = false;
-      printf("TEST_PopulateBoardFromFen FAILED @ Index %i: Expected (%u) does not match Actual (%u)\n", i, Expected.Squares[i], Actual.Squares[i]);
+      printf("TEST_PopulateBoardFromFen FAILED @ Index %i: Expected (%llu) does not match Actual (%llu)\n", i, Expected[i], Actual[i]);
+      printf("Actual: \n");
+      PrintBitboard(Actual[i]);
+      printf("Expected: \n");
+      PrintBitboard(Expected[i]);
       break;
-    };
-  };
+    }
+  }
   
   return result;
 };
 
 bool32 TEST_SideToMoveFromFEN() {
-  board Expected1 = {};
+  board_state Expected1 = {};
   Expected1.WhiteToMove = true;
 
-  board Expected2 = {};
+  board_state Expected2 = {};
   Expected2.WhiteToMove = false;
 
-  board Boards[] = { Expected1, Expected2 };
+  board_state Tests[] = { Expected1, Expected2 };
   char* FENS[] = { "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1" ,
                    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1" };
-  int test = 0;
-  int test_count = 2;
 
   bool32 result = true;
-  for (test; test < test_count; test++) {
+  for (int test = 0; test < ArrayCount(Tests); test++) {
     char* fen = FENS[test];
     int fendex = 44;
-    board Expected = Boards[test];
-    board Actual = {};
+    board_state Expected = Tests[test];
+    board_state Actual = {};
     SideToMoveFromFEN(&Actual, fen, &fendex);
     if (!Equal(Expected, Actual)) {
       result = false;
       printf("TEST_SideToMoveFromFEN() Test #%i FAILED!\n", test);
-      PrintBoard(Expected, "Expected Board");
-      PrintBoard(Actual, "Actual Board");
+      PrintBoardState(Expected, "Expected State");
+      PrintBoardState(Actual, "Actual State");
     }
   }
   return result;
@@ -137,37 +121,37 @@ bool32 TEST_CastlingAvailabilityFromFEN() {
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w q - 0 1"
   };
 
-  board Expected1 = {};
+  board_state Expected1 = {};
   Expected1.wCanCastleKingside  = true;
   Expected1.wCanCastleQueenside = true;
   Expected1.bCanCastleKingside  = true;
   Expected1.bCanCastleQueenside = true;
 
-  board Expected2 = {};
+  board_state Expected2 = {};
   Expected2.wCanCastleKingside  = false;
   Expected2.wCanCastleQueenside = false;
   Expected2.bCanCastleKingside  = false;
   Expected2.bCanCastleQueenside = false;
 
-  board Expected3 = {};
+  board_state Expected3 = {};
   Expected3.wCanCastleKingside  = false;
   Expected3.wCanCastleQueenside = false;
   Expected3.bCanCastleKingside  = true;
   Expected3.bCanCastleQueenside = true;
 
-  board Expected4 = {};
+  board_state Expected4 = {};
   Expected4.wCanCastleKingside  = true;
   Expected4.wCanCastleQueenside = true;
   Expected4.bCanCastleKingside  = false;
   Expected4.bCanCastleQueenside = false;
 
-  board Expected5 = {};
+  board_state Expected5 = {};
   Expected5.wCanCastleKingside  = false;
   Expected5.wCanCastleQueenside = false;
   Expected5.bCanCastleKingside  = false;
   Expected5.bCanCastleQueenside = true;
 
-  board Boards[] = {
+  board_state Tests[] = {
     Expected1,
     Expected2,
     Expected3,
@@ -175,23 +159,22 @@ bool32 TEST_CastlingAvailabilityFromFEN() {
     Expected5
   };		     
   
-  int test = 0;
-  int test_count = 5;
   bool32 result = true;
-  for (test; test < test_count; test++) {
-    board Expected = Boards[test];
-    board Actual = {};
+  for (int test = 0; test < ArrayCount(Tests); test++) {
+    board_state Expected = Tests[test];
+    board_state Actual = {};
     int fendex = 46;
     CastlingAvailabilityFromFEN(&Actual, FENS[test], &fendex);
     if (!Equal(Expected, Actual)) {
       result = false;
       printf("TEST_CastleAvailabilityFromFEN() Test #%i FAILED!\n", test);
-      PrintBoard(Expected, "Expected Board");
-      PrintBoard(Actual, "Actual Board");
+      PrintBoardState(Expected, "Expected State");
+      PrintBoardState(Actual, "Actual State");
     }
   }
   return result;
 }
+
 
 bool32 TEST_EnPassantFromFEN() {
   char* FENS[] = {
@@ -201,29 +184,28 @@ bool32 TEST_EnPassantFromFEN() {
   };
   int fendices[] = { 51, 53, 55 };
 
-  board Expected1 = {};
+  board_state Expected1 = {};
   Expected1.EnPassantTarget = 0;
 
-  board Expected2 = {};
+  board_state Expected2 = {};
   Expected2.EnPassantTarget = E3;
 
-  board Expected3 = {};
+  board_state Expected3 = {};
   Expected3.EnPassantTarget = C6;
 
-  board Boards[] = { Expected1, Expected2, Expected3 };
+  board_state Tests[] = { Expected1, Expected2, Expected3 };
 
-  int test_count = 3;
   bool32 result = true;
-  for (int test = 0; test < test_count; test++) {
-    board Expected = Boards[test];
-    board Actual = {};
+  for (int test = 0; test < ArrayCount(Tests); test++) {
+    board_state Expected = Tests[test];
+    board_state Actual = {};
     int fendex = fendices[test];
     EnPassantFromFEN(&Actual, FENS[test], &fendex);
     if (!Equal(Expected, Actual)) {
       result = false;
       printf("TEST_EnPassantFromFEN() Test #%i FAILED!\n", test);
-      PrintBoard(Expected, "Expected Board");
-      PrintBoard(Actual, "Actual Board");
+      PrintBoardState(Expected, "Expected State");
+      PrintBoardState(Actual, "Actual State");
     }
   };
   
@@ -238,25 +220,25 @@ bool32 TEST_MoveCountFromFEN() {
     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 100 1"
   };
 
-  board Expected1 = {};
+  board_state Expected1 = {};
   Expected1.HalfMoves = 0;
 
-  board Expected2 = {};
+  board_state Expected2 = {};
   Expected2.HalfMoves = 7;
 
-  board Expected3 = {};
+  board_state Expected3 = {};
   Expected3.HalfMoves = 42;
 
-  board Expected4 = {};
+  board_state Expected4 = {};
   Expected4.HalfMoves = 100;
 
-  board Boards[] = { Expected1, Expected2, Expected3, Expected4 };
+  board_state Tests[] = { Expected1, Expected2, Expected3, Expected4 };
 
   int test_count = 4;
   bool32 result = true;
   for (int test = 0; test < test_count; test++) {
-    board Expected = Boards[test];
-    board Actual = {};
+    board_state Expected = Tests[test];
+    board_state Actual = {};
     int fendex = 53;
     MoveCountFromFEN(&Actual.HalfMoves, FENS[test], &fendex);
   }
@@ -264,10 +246,11 @@ bool32 TEST_MoveCountFromFEN() {
   return result;
 }
 
-bool32 TEST_FENToBoard() {
+bool32 TEST_FENToBitboards() {
   char* starting_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-  board Expected = {};
+  bitboard ExpectedBitboards[16] = {};
+  board_state ExpectedState = {};
   piece ExpectedPieces[] = { // from 0 = A1 to 63 = H8
     wROOK, wKNIGHT, wBISHOP, wQUEEN, wKING, wBISHOP, wKNIGHT, wROOK,
     wPAWN, wPAWN, wPAWN, wPAWN, wPAWN, wPAWN, wPAWN, wPAWN,
@@ -278,26 +261,52 @@ bool32 TEST_FENToBoard() {
     bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN, bPAWN,
     bROOK, bKNIGHT, bBISHOP, bQUEEN, bKING, bBISHOP, bKNIGHT, bROOK
   };
-  Expected.WhiteToMove = true;
-  Expected.wCanCastleKingside = true;
-  Expected.wCanCastleQueenside = true;
-  Expected.bCanCastleKingside = true;
-  Expected.bCanCastleQueenside = true;
-  Expected.EnPassantTarget = 0;
-  Expected.HalfMoves = 0;
-  Expected.FullMoves = 1;
-  for (int i = 0; i < 64; i++) { Expected.Squares[i] = ExpectedPieces[i]; }
+  ExpectedState.WhiteToMove = true;
+  ExpectedState.wCanCastleKingside = true;
+  ExpectedState.wCanCastleQueenside = true;
+  ExpectedState.bCanCastleKingside = true;
+  ExpectedState.bCanCastleQueenside = true;
+  ExpectedState.EnPassantTarget = 0;
+  ExpectedState.HalfMoves = 0;
+  ExpectedState.FullMoves = 1;
+  for (int i = 0; i < 64; i++) { SetBitboard(ExpectedBitboards, ExpectedPieces[i], i); }
 
-  board Actual = {};
+  ExpectedBitboards[OCCUP_SQ] = (ExpectedBitboards[wPAWN]   |
+				 ExpectedBitboards[wBISHOP] |
+				 ExpectedBitboards[wKNIGHT] |
+				 ExpectedBitboards[wROOK]   |
+				 ExpectedBitboards[wQUEEN]  |
+				 ExpectedBitboards[wKING]   |
+				 ExpectedBitboards[bPAWN]   |
+				 ExpectedBitboards[bBISHOP] |
+				 ExpectedBitboards[bKNIGHT] |
+				 ExpectedBitboards[bROOK]   |
+				 ExpectedBitboards[bQUEEN]  |
+				 ExpectedBitboards[bKING]);
 
-  FENToBoard(starting_FEN, &Actual);
+  ExpectedBitboards[EMPTY_SQ] = ~(ExpectedBitboards[OCCUP_SQ]);
+  
+  bitboard ActualBitboards[16] = {};
+  board_state ActualState = {};
+
+  FENToBitboards(starting_FEN, ActualBitboards, &ActualState);
   bool32 result = true;
-  if (!Equal(Expected, Actual)) {
+  if (!Equal(ExpectedState, ActualState)) {
     result = false;
-    printf("TEST_FENToBoard() FAILED!\n");
-    PrintBoard(Expected, "Expected Board");
-    PrintBoard(Actual, "Actual Board");
+    printf("TEST_FENToBitboards() FAILED! State mismatch\n");
+    PrintBoardState(ExpectedState, "Expected State");
+    PrintBoardState(ActualState, "Actual State");
   };
+  for (int i = 0; i < 16; i++) {
+    if (ExpectedBitboards[i] != ActualBitboards[i]) {
+      result = false;
+      printf("TEST_TO_FENToBitboards() FAILED! Bitboard %i mismatch\n", i);
+      printf("Expected: \n");
+      PrintBitboard(ExpectedBitboards[i]);
+      printf("Actual: \n");
+      PrintBitboard(ActualBitboards[i]);
+    }
+  }
   return result;
 };
 

@@ -2,6 +2,15 @@
 
 #include "bitboard.h"
 
+uint64 Power(uint8 base, uint8 exp) {
+  if (base == 0 || exp == 0) return 0;
+  uint64 result = 1;
+  for (int i = 0; i < exp; i++) {
+    result *= base;
+  }
+  return result;
+}
+
 bool32 TEST_SetBit() {
   bool32 result = true;
   for (int i = 0; i < 64; i++) {
@@ -63,13 +72,13 @@ bool32 TEST_CheckBit() {
   for (int i = 0; i < 64; i++) {
     uint64 actual = 0;
     SetBit(&actual, i);
-    if (!CheckBit(&actual, i)) {
+    if (!CheckBit(actual, i)) {
       printf("TEST_CheckBit FAILED: Did not detect set bit %i.", i);
       result = false;
       break;
     }
     ClearBit(&actual, i);
-    if (CheckBit(&actual, i)) {
+    if (CheckBit(actual, i)) {
       printf("TEST_CheckBit FAILED: Still detecting cleared bit %i.", i);
       result = false;
       break;
