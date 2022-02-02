@@ -60,10 +60,10 @@ struct back_buffer {
 };
 
 struct pixel_values {
-  int TotalTexture;  // size in one dimension (256x256 = 256)
+  int TotalTexture;  // No. pixels in one dimension (256x256 = 256)
   int InnerPadding;  // No. pixels until actual board begins
-  int PieceTexture;  // size in one dimension (20x20 = 20)
-  int BoardSquare;   // size in one dimension (22x22 = 22)
+  int PieceTexture;  // No. pixels in one dimension (20x20 = 20)
+  int BoardSquare;   // No. pixels in one dimension (22x22 = 22)
   int SquarePadding; // No. pixels to offset pieces when drawing the board
   int CenteredX;     // The leftmost X value when the texture is centered
 };
@@ -106,12 +106,15 @@ struct chess_state {
   bitboard Bitboards[16];
   board_state BoardState;
   mailbox Mailbox;
+  bitboard RookAtkLookup[64];
+  bitboard BishopAtkLookup[64];
 
   // Input
   bool32 DragMode;
   piece DraggedPiece;
   int DraggedPieceOrigin;
   bitboard DraggedPieceLegalMoves;
+  bitboard DraggedPieceLegalAttacks;
   
   // GUI
   big_texture  BoardTex;

@@ -151,7 +151,10 @@ typedef uint64 bitboard;
 #define EMPTY_SQ 0x8
 #define UNUSED   0xF
 
-static char* SquareLookup[] = {
+global_var bitboard notA = 0xFEFEFEFEFEFEFEFE;
+global_var bitboard notH = 0x7F7F7F7F7F7F7F7F;
+
+global_var char* SquareLookup[] = {
   "A1", "B1", "C1", "D1", "E1", "F1", "G1", "H1", 
   "A2", "B2", "C2", "D2", "E2", "F2", "G2", "H2",
   "A3", "B3", "C3", "D3", "E3", "F3", "G3", "H3",
@@ -162,7 +165,7 @@ static char* SquareLookup[] = {
   "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8"
 };
 
-static bitboard KnightMoves[64] = {
+global_var bitboard KnightMoves[64] = {
   0x0000000000020400, // A1
   0x0000000000050800, // B1
   0x00000000000A1100, // C1

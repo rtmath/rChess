@@ -64,7 +64,7 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
 
     FENToBitboards(starting_position, &State->Bitboards[0], &State->BoardState);
     PopulateMailbox(&State->Bitboards[0], &State->Mailbox);
-    
+
     Memory->IsInitialized = true;
   }
   
@@ -82,19 +82,23 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
     State->DraggedPiece = State->Mailbox.Squares[BoardCoord];
     State->DraggedPieceOrigin = BoardCoord;
     State->Mailbox.Squares[BoardCoord] = EMPTY;
-    bitboard legal_moves = PseudoLegalMoves(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ]);
-    State->DraggedPieceLegalMoves = legal_moves;
+    State->DraggedPieceLegalMoves = PseudoLegalMoves(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ]);
+    bitboard EnemyOccupation = State->Bitboards[bPAWN] | State->Bitboards[bBISHOP] | State->Bitboards[bKNIGHT] | State->Bitboards[bROOK] | State->Bitboards[bQUEEN] | State->Bitboards[bKING];
+    State->DraggedPieceLegalAttacks = PseudoLegalAttacks(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ], EnemyOccupation);
     State->DragMode = true;
   }
-  
+
   if (!LMB_pressed && State->DragMode) {
     int BoardX = ((MouseX - State->BoardTexDims.MinX) / State->BoardTexPxVals.BoardSquare);
     int BoardY = ((MouseY - State->BoardTexDims.MinY) / State->BoardTexPxVals.BoardSquare);
     int BoardCoord = (8 * (7 - BoardY)) + (BoardX);
-    if (CheckBit(State->DraggedPieceLegalMoves, BoardCoord) &&
+    if ((CheckBit(State->DraggedPieceLegalMoves, BoardCoord) ||
+	 CheckBit(State->DraggedPieceLegalAttacks, BoardCoord)) &&
 	WithinDims(MouseX, MouseY, State->BoardTexDims)) {
       int origin = State->DraggedPieceOrigin;
       int destination = BoardCoord;
+      int piece_at_destination = State->Mailbox.Squares[BoardCoord];
+      ClearPiece(&State->Bitboards[piece_at_destination], BoardCoord);
       UpdateBitboard(&State->Bitboards[0], State->DraggedPiece, origin, destination);
       MovePiece(&State->Bitboards[EMPTY_SQ], destination, origin); // Inverse of moving a piece
       MovePiece(&State->Bitboards[OCCUP_SQ], origin, destination);
@@ -104,17 +108,20 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
     } else {
       State->Mailbox.Squares[State->DraggedPieceOrigin] = State->DraggedPiece;
     }
+    
     State->DragMode = false;
     State->DraggedPieceOrigin = 0;
     State->DraggedPiece = EMPTY;
     State->DraggedPieceLegalMoves = 0;
-  };
+    State->DraggedPieceLegalAttacks = 0;
+  }
 
   DrawTexture(Buffer, State->BoardTex, State->BoardTexPxVals.CenteredX, 0, State->TextureScale);
-  
-  DrawPieces(Buffer, State, &State->Mailbox, State->TextureScale);
+  DrawSquareOverlay(Buffer, State->DraggedPieceLegalAttacks, State->TextureScale, 0x00FF0000);  
   DrawSquareOverlay(Buffer, State->Bitboards[EMPTY_SQ], State->TextureScale, 0x00AAAA00);
   DrawSquareOverlay(Buffer, State->DraggedPieceLegalMoves, State->TextureScale, 0x0000FF00);
+
+  DrawPieces(Buffer, State, &State->Mailbox, State->TextureScale);
 
   if (State->DragMode) {
     DrawPiece(Buffer, State, State->DraggedPiece, MouseX - (State->BoardTexPxVals.BoardSquare / 2), MouseY - (State->BoardTexPxVals.BoardSquare / 2), State->TextureScale);

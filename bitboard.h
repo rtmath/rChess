@@ -1,5 +1,7 @@
 #ifndef BITBOARD_H
 
+#define EMPTY_BITBOARD 0
+
 void PrintBinary(uint64 n) {
   byte rep[65] = {};
   uint64 mask = (1ULL << 63);
@@ -24,7 +26,7 @@ void PrintBitboard(bitboard B) {
   putc('\n', stdout);
 }
 
-inline uint64
+inline bitboard
 BitboardWithBitSet(bitboard n, unsigned char nth_place) {
   Assert(nth_place < 64);
   return n | (0x1ULL << nth_place);
@@ -36,6 +38,12 @@ SetBit(uint64* target, unsigned char nth_place) {
   uint64 index = 0x1;
   *target |= (index << nth_place);
 }
+
+inline bitboard
+ClearBit(bitboard bb, unsigned char nth_place) {
+  uint64 index = 0x1;
+  return (bb & ~(index << nth_place));
+};
 
 inline void
 ClearBit(uint64* target, unsigned char nth_place) {
@@ -61,6 +69,10 @@ inline void
 SetPiece(bitboard* B, int destination) {
   SetBit(B, destination);
 };
+
+inline void ClearPiece(bitboard* B, int location) {
+  ClearBit(B, location);
+}
 
 inline void
 MovePiece(bitboard* B, int origin, int destination) {
@@ -94,7 +106,6 @@ bitboard FloodFillS(bitboard Pieces, bitboard Empties) {
 }
 
 bitboard FloodFillW(bitboard Pieces, bitboard Empties) {
-  bitboard notH = 0x7F7F7F7F7F7F7F7F;
   Empties &= notH;
   bitboard flood = Pieces & Empties;
   flood |= Pieces = ((Pieces >> 1) & Empties);
@@ -108,7 +119,6 @@ bitboard FloodFillW(bitboard Pieces, bitboard Empties) {
 }
 
 bitboard FloodFillE(bitboard Pieces, bitboard Empties) {
-  bitboard notA = 0xFEFEFEFEFEFEFEFE;
   Empties &= notA;
   bitboard flood = Pieces & Empties;
   flood |= Pieces = (Pieces << 1) & Empties;
@@ -121,12 +131,7 @@ bitboard FloodFillE(bitboard Pieces, bitboard Empties) {
   return flood & notA;
 }
 
-// The chessprogramming wiki shows these functions returning (flood shift n) & notFile
-// but this was causing the flood fills to ignore occupied squares one shift away.
-// I replaced & notFile with & Empties, since Empties contains the notFile information
-// from the earlier &
 bitboard FloodFillNE(bitboard Pieces, bitboard Empties) {
-  bitboard notA = 0xFEFEFEFEFEFEFEFE;
   bitboard flood = Pieces;
   Empties &= notA;
   flood |= Pieces = (Pieces << 9) & Empties;
@@ -139,7 +144,6 @@ bitboard FloodFillNE(bitboard Pieces, bitboard Empties) {
 }
 
 bitboard FloodFillSE(bitboard Pieces, bitboard Empties) {
-  bitboard notA = 0xFEFEFEFEFEFEFEFE;
   bitboard flood = Pieces;
   Empties &= notA;
   flood |= Pieces = (Pieces >> 7) & Empties;
@@ -152,7 +156,6 @@ bitboard FloodFillSE(bitboard Pieces, bitboard Empties) {
 }
 
 bitboard FloodFillNW(bitboard Pieces, bitboard Empties) {
-  bitboard notH = 0x7F7F7F7F7F7F7F7F;
   bitboard flood = Pieces;
   Empties &= notH;
   flood |= Pieces = (Pieces << 7) & Empties;
@@ -165,7 +168,6 @@ bitboard FloodFillNW(bitboard Pieces, bitboard Empties) {
 }
 
 bitboard FloodFillSW(bitboard Pieces, bitboard Empties) {
-  bitboard notH = 0x7F7F7F7F7F7F7F7F;
   bitboard flood = Pieces;
   Empties &= notH;
   flood |= Pieces = (Pieces >> 9) & Empties;
@@ -175,6 +177,100 @@ bitboard FloodFillSW(bitboard Pieces, bitboard Empties) {
   flood |= Pieces = (Pieces >> 9) & Empties;
   flood |=          (Pieces >> 9) & Empties;
   return             (flood >> 9) & Empties;
+}
+
+bitboard FloodAttacksS(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  flood |= Pieces = (Pieces >> 8) & Empties;
+  flood |= Pieces = (Pieces >> 8) & Empties;
+  flood |= Pieces = (Pieces >> 8) & Empties;
+  flood |= Pieces = (Pieces >> 8) & Empties;
+  flood |= Pieces = (Pieces >> 8) & Empties;
+  flood |=          (Pieces >> 8) & Empties;
+  return             (flood >> 8);
+}
+
+bitboard FloodAttacksN(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  flood |= Pieces = (Pieces << 8) & Empties;
+  flood |= Pieces = (Pieces << 8) & Empties;
+  flood |= Pieces = (Pieces << 8) & Empties;
+  flood |= Pieces = (Pieces << 8) & Empties;
+  flood |= Pieces = (Pieces << 8) & Empties;
+  flood |=          (Pieces << 8) & Empties;
+  return             (flood << 8);
+}
+
+bitboard FloodAttacksE(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notA;
+  flood |= Pieces = (Pieces << 1) & Empties;
+  flood |= Pieces = (Pieces << 1) & Empties;
+  flood |= Pieces = (Pieces << 1) & Empties;
+  flood |= Pieces = (Pieces << 1) & Empties;
+  flood |= Pieces = (Pieces << 1) & Empties;
+  flood |=          (Pieces << 1) & Empties;
+  return             (flood << 1) & notA;
+}
+
+bitboard FloodAttacksNE(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notA;
+  flood |= Pieces = (Pieces << 9) & Empties;
+  flood |= Pieces = (Pieces << 9) & Empties;
+  flood |= Pieces = (Pieces << 9) & Empties;
+  flood |= Pieces = (Pieces << 9) & Empties;
+  flood |= Pieces = (Pieces << 9) & Empties;
+  flood |=          (Pieces << 9) & Empties;
+  return             (flood << 9) & notA;
+}
+
+bitboard FloodAttacksSE(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notA;
+  flood |= Pieces = (Pieces >> 7) & Empties;
+  flood |= Pieces = (Pieces >> 7) & Empties;
+  flood |= Pieces = (Pieces >> 7) & Empties;
+  flood |= Pieces = (Pieces >> 7) & Empties;
+  flood |= Pieces = (Pieces >> 7) & Empties;
+  flood |=          (Pieces >> 7) & Empties;
+  return             (flood >> 7) & notA;
+}
+
+bitboard FloodAttacksW(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notH;
+  flood |= Pieces = (Pieces >> 1) & Empties;
+  flood |= Pieces = (Pieces >> 1) & Empties;
+  flood |= Pieces = (Pieces >> 1) & Empties;
+  flood |= Pieces = (Pieces >> 1) & Empties;
+  flood |= Pieces = (Pieces >> 1) & Empties;
+  flood |=          (Pieces >> 1) & Empties;
+  return             (flood >> 1) & notH;
+}
+
+bitboard FloodAttacksSW(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notH;
+  flood |= Pieces = (Pieces >> 9) & Empties;
+  flood |= Pieces = (Pieces >> 9) & Empties;
+  flood |= Pieces = (Pieces >> 9) & Empties;
+  flood |= Pieces = (Pieces >> 9) & Empties;
+  flood |= Pieces = (Pieces >> 9) & Empties;
+  flood |=          (Pieces >> 9) & Empties;
+  return             (flood >> 9) & notH;
+}
+
+bitboard FloodAttacksNW(bitboard Pieces, bitboard Empties) {
+  bitboard flood = Pieces;
+  Empties &= notH;
+  flood |= Pieces = (Pieces << 7) & Empties;
+  flood |= Pieces = (Pieces << 7) & Empties;
+  flood |= Pieces = (Pieces << 7) & Empties;
+  flood |= Pieces = (Pieces << 7) & Empties;
+  flood |= Pieces = (Pieces << 7) & Empties;
+  flood |=          (Pieces << 7) & Empties;
+  return             (flood << 7) & notH;
 }
 
 bitboard
@@ -222,18 +318,75 @@ PseudoLegalMoves(piece Piece, int PieceBoardCoord, bitboard EmptySquares) {
   } break;
   case wKING:
   case bKING: {
-    legal_moves = ((p << 8) & EmptySquares) | // North
-                  ((p >> 8) & EmptySquares) | // South
-                  ((p << 1) & EmptySquares) | // East
-                  ((p >> 1) & EmptySquares) | // West
-                  ((p << 9) & EmptySquares) | // NE
-                  ((p >> 7) & EmptySquares) | // SE
-                  ((p << 7) & EmptySquares) | // NW
-                  ((p >> 9) & EmptySquares);  // SW
-                   
+    legal_moves = ((p << 8) & EmptySquares)        | // North
+                  ((p >> 8) & EmptySquares)        | // South
+                  ((p << 1) & EmptySquares & notA) | // East
+                  ((p >> 1) & EmptySquares & notH) | // West
+                  ((p << 9) & EmptySquares & notA) | // NE
+                  ((p >> 7) & EmptySquares & notA) | // SE
+                  ((p << 7) & EmptySquares & notH) | // NW
+                  ((p >> 9) & EmptySquares & notH);  // SW
   } break;
   }
   return legal_moves;
+};
+
+bitboard
+PseudoLegalAttacks(piece Piece, int PieceBoardCoord, bitboard Empties, bitboard EnemyOccupation) {
+  bitboard legal_attacks = 0;
+  bitboard p = BitboardWithBitSet(0, PieceBoardCoord);
+  
+  switch (Piece) {
+  case wPAWN: {
+    legal_attacks = (((p << 7) & EnemyOccupation) | // NW
+                     ((p << 9) & EnemyOccupation)); // NE
+  } break;
+  case bPAWN: {
+    legal_attacks = (((p >> 9) & EnemyOccupation) | // SW
+		     ((p >> 7) & EnemyOccupation)); // SE
+  } break;
+  case wBISHOP:
+  case bBISHOP: {
+    legal_attacks =  (FloodAttacksNW(p, Empties) |
+                      FloodAttacksNE(p, Empties) |
+                      FloodAttacksSW(p, Empties) |
+                      FloodAttacksSE(p, Empties)) & EnemyOccupation;
+  } break;
+  case wKNIGHT:
+  case bKNIGHT: {
+    legal_attacks = KnightMoves[PieceBoardCoord] & EnemyOccupation;
+  } break;
+  case wROOK:
+  case bROOK: {
+    legal_attacks = (FloodAttacksN(p, Empties) |
+		     FloodAttacksS(p, Empties) |
+		     FloodAttacksE(p, Empties) |
+		     FloodAttacksW(p, Empties)) & EnemyOccupation;
+  } break;
+  case wQUEEN:
+  case bQUEEN: {
+    legal_attacks = (FloodAttacksNW(p, Empties) |
+                     FloodAttacksNE(p, Empties) |
+                     FloodAttacksSW(p, Empties) |
+                     FloodAttacksSE(p, Empties) |
+                     FloodAttacksN(p, Empties)  |
+                     FloodAttacksS(p, Empties)  |
+                     FloodAttacksW(p, Empties)  |
+                     FloodAttacksE(p, Empties)) & EnemyOccupation;
+  } break;
+  case wKING:
+  case bKING: {
+    legal_attacks = ((p << 8) & EnemyOccupation)        | // North
+                    ((p >> 8) & EnemyOccupation)        | // South
+                    ((p << 1) & EnemyOccupation & notA) | // East
+                    ((p >> 1) & EnemyOccupation & notH) | // West
+                    ((p << 9) & EnemyOccupation & notA) | // NE
+                    ((p >> 7) & EnemyOccupation & notA) | // SE
+                    ((p << 7) & EnemyOccupation & notH) | // NW
+                    ((p >> 9) & EnemyOccupation & notH);  // SW
+  } break;
+  }
+  return legal_attacks;
 };
 
 void SetBitboard(bitboard* Boards, piece Piece, int destination) {
