@@ -3,13 +3,25 @@
 #include "bmp.h"
 #include "graphics.h"
 #include "bitboard.h"
+#include "undo.h"
 #include "tests/test_bitboard.h"
 #include "tests/test_fen.h"
+
+// TODO:
+//   Detect if King is in check
+//   Pawn Promotions
+//   En Passant pawn captures
 
 inline bool32
 WithinDims(int x, int y, dims Dims) {
   return ((x >= Dims.MinX) && (y >= Dims.MinY) &&
 	  (x <= Dims.MaxX) && (y <= Dims.MaxY));
+};
+
+inline bool32
+PieceBelongsToPlayer(piece P, bool32 WhiteToMove) {
+  if (P == EMPTY) { return false; }
+  return ((P & W_MASK) > 0) == WhiteToMove;
 };
 
 extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffer) {
@@ -59,6 +71,11 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
     State->BoardTexDims.MaxX = State->BoardTexDims.MinX + (176 * State->TextureScale);
     State->BoardTexDims.MinY = State->BoardTexPxVals.InnerPadding;
     State->BoardTexDims.MaxY = State->BoardTexPxVals.TotalTexture - State->BoardTexPxVals.InnerPadding;
+
+    State->UndoButtonDims.MinX = 10;
+    State->UndoButtonDims.MinY = 10;
+    State->UndoButtonDims.MaxX = 100;
+    State->UndoButtonDims.MaxY = 100;
     
     char* starting_position = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -70,9 +87,15 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
   
   int MouseX = Input->MouseX;
   int MouseY = Input->MouseY;
-  int LMB_pressed = Input->Buttons[0].EndedDown;
-
+  bool32 LMB_pressed = Input->Buttons[0].EndedDown && Input->Buttons[0].JustTransitioned;
+  bool32 LMB_released = (!Input->Buttons[0].EndedDown) && Input->Buttons[0].JustTransitioned;
+  
   ClearScreen(Buffer, 0x00000000);
+
+  if (LMB_pressed && WithinDims(MouseX, MouseY, State->UndoButtonDims)) {
+    move M = UndoMove();
+    UpdateStateFromUndo(State, M);
+  }
 
   if (LMB_pressed && !State->DragMode &&
       WithinDims(MouseX, MouseY, State->BoardTexDims)) {
@@ -80,15 +103,18 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
     int BoardY = ((MouseY - State->BoardTexDims.MinY) / State->BoardTexPxVals.BoardSquare);
     int BoardCoord = (8 * (7 - BoardY)) + (BoardX);
     State->DraggedPiece = State->Mailbox.Squares[BoardCoord];
-    State->DraggedPieceOrigin = BoardCoord;
-    State->Mailbox.Squares[BoardCoord] = EMPTY;
-    State->DraggedPieceLegalMoves = PseudoLegalMoves(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ]);
-    bitboard EnemyOccupation = State->Bitboards[bPAWN] | State->Bitboards[bBISHOP] | State->Bitboards[bKNIGHT] | State->Bitboards[bROOK] | State->Bitboards[bQUEEN] | State->Bitboards[bKING];
-    State->DraggedPieceLegalAttacks = PseudoLegalAttacks(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ], EnemyOccupation);
-    State->DragMode = true;
+    if (PieceBelongsToPlayer(State->DraggedPiece, State->BoardState.WhiteToMove)) {
+      State->DraggedPieceOrigin = BoardCoord;
+      State->Mailbox.Squares[BoardCoord] = EMPTY;
+      State->DraggedPieceLegalMoves = PseudoLegalMoves(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ]);
+      bitboard WhiteOccupation = State->Bitboards[wPAWN] | State->Bitboards[wBISHOP] | State->Bitboards[wKNIGHT] | State->Bitboards[wROOK] | State->Bitboards[wQUEEN] | State->Bitboards[wKING];
+      bitboard BlackOccupation = State->Bitboards[bPAWN] | State->Bitboards[bBISHOP] | State->Bitboards[bKNIGHT] | State->Bitboards[bROOK] | State->Bitboards[bQUEEN] | State->Bitboards[bKING];
+      State->DraggedPieceLegalAttacks = PseudoLegalAttacks(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ], (State->BoardState.WhiteToMove) ? BlackOccupation : WhiteOccupation );
+      State->DragMode = true;
+    }
   }
 
-  if (!LMB_pressed && State->DragMode) {
+  if (LMB_released && State->DragMode) {
     int BoardX = ((MouseX - State->BoardTexDims.MinX) / State->BoardTexPxVals.BoardSquare);
     int BoardY = ((MouseY - State->BoardTexDims.MinY) / State->BoardTexPxVals.BoardSquare);
     int BoardCoord = (8 * (7 - BoardY)) + (BoardX);
@@ -97,18 +123,27 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
 	WithinDims(MouseX, MouseY, State->BoardTexDims)) {
       int origin = State->DraggedPieceOrigin;
       int destination = BoardCoord;
-      int piece_at_destination = State->Mailbox.Squares[BoardCoord];
+      piece piece_at_destination = State->Mailbox.Squares[BoardCoord];
+      
       ClearPiece(&State->Bitboards[piece_at_destination], BoardCoord);
       UpdateBitboard(&State->Bitboards[0], State->DraggedPiece, origin, destination);
       MovePiece(&State->Bitboards[EMPTY_SQ], destination, origin); // Inverse of moving a piece
       MovePiece(&State->Bitboards[OCCUP_SQ], origin, destination);
+
+      move M = {};
+      M.MovedPiece = State->DraggedPiece;
+      M.CapturedPiece = piece_at_destination;
+      M.Origin = origin;
+      M.Destination = destination;
+      StoreMove(M);
       
       State->Mailbox.Squares[BoardCoord] = State->DraggedPiece;
       State->DraggedPieceOrigin = 0;
+      State->BoardState.WhiteToMove = !State->BoardState.WhiteToMove;
     } else {
       State->Mailbox.Squares[State->DraggedPieceOrigin] = State->DraggedPiece;
     }
-    
+
     State->DragMode = false;
     State->DraggedPieceOrigin = 0;
     State->DraggedPiece = EMPTY;
@@ -123,6 +158,8 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
 
   DrawPieces(Buffer, State, &State->Mailbox, State->TextureScale);
 
+  DrawRectangle(Buffer, State->UndoButtonDims.MinX, State->UndoButtonDims.MinY, State->UndoButtonDims.MaxX, State->UndoButtonDims.MaxY, 0x00FF0000);
+  
   if (State->DragMode) {
     DrawPiece(Buffer, State, State->DraggedPiece, MouseX - (State->BoardTexPxVals.BoardSquare / 2), MouseY - (State->BoardTexPxVals.BoardSquare / 2), State->TextureScale);
   }

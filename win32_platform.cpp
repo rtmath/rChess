@@ -140,6 +140,7 @@ Win32ProcessPendingMessages(input* Input) {
 
 internal void
 Win32ProcessKeyboardMessage(button* Button, bool32 IsDown) {
+  Button->JustTransitioned = (Button->EndedDown != IsDown);
   if (Button->EndedDown != IsDown) {
     Button->EndedDown = IsDown;
   }
@@ -232,6 +233,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int Comma
     while (Running) {
       for (int i = 0; i < ArrayCount(NewInput->Buttons); i++) {
         NewInput->Buttons[i].EndedDown = OldInput->Buttons[i].EndedDown;
+	NewInput->Buttons[i].JustTransitioned = OldInput->Buttons[i].JustTransitioned;
       }
 
       Win32ProcessPendingMessages(NewInput);
@@ -246,9 +248,9 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int Comma
       Win32ProcessKeyboardMessage(&NewInput->Buttons[0],
 				  GetKeyState(VK_LBUTTON) & high_bit);
       Win32ProcessKeyboardMessage(&NewInput->Buttons[1],
-				  GetKeyState(VK_LBUTTON) & high_bit);
+				  GetKeyState(VK_RBUTTON) & high_bit);
       Win32ProcessKeyboardMessage(&NewInput->Buttons[2],
-				  GetKeyState(VK_LBUTTON) & high_bit);
+				  GetKeyState(VK_MBUTTON) & high_bit);
 
       back_buffer bBuffer = {};
       bBuffer.Memory = GlobalBackBuffer.Memory;
@@ -256,7 +258,7 @@ WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, LPSTR CommandLine, int Comma
       bBuffer.Height = GlobalBackBuffer.Height;
       bBuffer.Pitch = GlobalBackBuffer.Pitch;
       bBuffer.BytesPerPixel = GlobalBackBuffer.BytesPerPixel;
-      UpdateAndRender(Input, &Memory, &bBuffer);
+      UpdateAndRender(NewInput, &Memory, &bBuffer);
 
       win32_window_dimensions windims = Win32GetWindowDimensions(Window);
       Win32DisplayBufferInWindow(&GlobalBackBuffer, DeviceContext,

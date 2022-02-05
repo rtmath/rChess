@@ -410,6 +410,7 @@ ToMailbox(bitboard BB, piece PieceType, mailbox* Mailbox) {
 
 inline void
 PopulateMailbox(bitboard* Bitboards, mailbox* Mailbox) {
+  *Mailbox = {};
   ToMailbox(Bitboards[bPAWN],     bPAWN, Mailbox);
   ToMailbox(Bitboards[bBISHOP], bBISHOP, Mailbox);
   ToMailbox(Bitboards[bKNIGHT], bKNIGHT, Mailbox);
@@ -423,6 +424,16 @@ PopulateMailbox(bitboard* Bitboards, mailbox* Mailbox) {
   ToMailbox(Bitboards[wQUEEN],   wQUEEN, Mailbox);
   ToMailbox(Bitboards[wKING],     wKING, Mailbox);
 }
+
+inline bitboard
+CalculateOccupation(bitboard Bitboards[]) {
+  return Bitboards[wPAWN]   | Bitboards[wBISHOP] |
+         Bitboards[wKNIGHT] | Bitboards[wROOK] |
+         Bitboards[wQUEEN]  | Bitboards[wKING] |
+         Bitboards[bPAWN]   | Bitboards[bBISHOP] |
+         Bitboards[bKNIGHT] | Bitboards[bROOK] |
+         Bitboards[bQUEEN]  | Bitboards[bKING];
+};
 
 #define BITBOARD_H
 #endif
