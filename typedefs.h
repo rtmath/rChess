@@ -23,6 +23,14 @@ typedef unsigned char byte;
 typedef uint8 piece;
 typedef uint64 bitboard;
 
+#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
+#define Assert(Expression) if(!(Expression)) {*(int*)0 = 0;}
+
+#define Kilobytes(value) ((value)*1024LL)
+#define Megabytes(value) ((Kilobytes(value) * 1024LL))
+#define Gigabytes(value) ((Megabytes(value) * 1024LL))
+#define Terabytes(value) ((Gigabytes(value) * 1024LL))
+
 // Disambiguate "static" keyword, internal is intended to confine the function to its TU
 #define global_var static
 #define internal   static

@@ -2,14 +2,6 @@
 
 #include "typedefs.h"
 
-#define ArrayCount(Array) (sizeof(Array) / sizeof(Array[0]))
-#define Assert(Expression) if(!(Expression)) {*(int*)0 = 0;}
-
-#define Kilobytes(value) ((value)*1024LL)
-#define Megabytes(value) ((Kilobytes(value) * 1024LL))
-#define Gigabytes(value) ((Megabytes(value) * 1024LL))
-#define Terabytes(value) ((Gigabytes(value) * 1024LL))
-
 struct read_file_result {
   uint32 ContentsSize;
   void*  Contents;
@@ -109,6 +101,7 @@ struct move {
   piece PromotedPiece;
   uint8 Origin;
   uint8 Destination;
+  uint8 EnPassantTarget;
   bool8 wLostCastleKingside;
   bool8 wLostCastleQueenside;
   bool8 bLostCastleKingside;

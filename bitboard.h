@@ -1,7 +1,5 @@
 #ifndef BITBOARD_H
 
-#define EMPTY_BITBOARD 0
-
 void PrintBinary(uint64 n) {
   byte rep[65] = {};
   uint64 mask = (1ULL << 63);
@@ -65,10 +63,19 @@ CheckBit(uint64 n, unsigned char nth_place) {
   return !!((n >> nth_place) & 0x1ULL);
 };
 
+inline bool32 IsWhite(piece P) {
+  return (P & W_MASK) > 0;
+}
+
+inline bool32 PieceIsType(piece P, piece Type) {
+  P = P & (~W_MASK); // remove color identifier from P
+  return P == (P & Type);
+}
+
 inline void
 SetPiece(bitboard* B, int destination) {
   SetBit(B, destination);
-};
+}
 
 inline void ClearPiece(bitboard* B, int location) {
   ClearBit(B, location);
@@ -78,7 +85,64 @@ inline void
 MovePiece(bitboard* B, int origin, int destination) {
   ClearBit(B, origin);
   SetBit(B, destination);
-};
+}
+
+void MovePiece(bitboard* Boards, piece Piece, int origin, int destination) {
+  if (Piece == EMPTY) { return; }
+  MovePiece(&Boards[Piece], origin, destination);
+}
+
+void SetPiece(bitboard* Boards, piece Piece, int destination) {
+  if (Piece == EMPTY) { return; }
+  SetPiece(&Boards[Piece], destination);
+}
+
+inline void
+ToMailbox(bitboard BB, piece PieceType, mailbox* Mailbox) {
+  if (!BB) { return; }
+  for (int i = 0; i < 64; i++) {
+    if (BB & 0x1ULL) { Mailbox->Squares[i] = PieceType; }
+    BB >>= 1;
+  }
+}
+
+inline void
+PopulateMailbox(bitboard* Bitboards, mailbox* Mailbox) {
+  *Mailbox = {};
+  ToMailbox(Bitboards[bPAWN],     bPAWN, Mailbox);
+  ToMailbox(Bitboards[bBISHOP], bBISHOP, Mailbox);
+  ToMailbox(Bitboards[bKNIGHT], bKNIGHT, Mailbox);
+  ToMailbox(Bitboards[bROOK],     bROOK, Mailbox);
+  ToMailbox(Bitboards[bQUEEN],   bQUEEN, Mailbox);
+  ToMailbox(Bitboards[bKING],     bKING, Mailbox);
+  ToMailbox(Bitboards[wPAWN],     wPAWN, Mailbox);
+  ToMailbox(Bitboards[wBISHOP], wBISHOP, Mailbox);
+  ToMailbox(Bitboards[wKNIGHT], wKNIGHT, Mailbox);
+  ToMailbox(Bitboards[wROOK],     wROOK, Mailbox);
+  ToMailbox(Bitboards[wQUEEN],   wQUEEN, Mailbox);
+  ToMailbox(Bitboards[wKING],     wKING, Mailbox);
+}
+
+inline int BitScanForward(bitboard B) {
+  // Naively locate Least Significant 1 bit position
+  if (!B) { return -1; }
+  for (int i = 0; i < 64; i++) {
+    if (B & 0x1ULL) { return i; }
+    B >>= 1;
+  }
+  return -1;
+}
+
+inline int BitScanReverse(bitboard B) {
+  // Naively locate Most Significant 1 bit position
+  if (!B) { return -1; }
+  uint64 mask = (0x1ULL << 63);
+  for (int i = 63; i >= 0; i--) {
+    if (B & mask) { return i; }
+    B <<= 1;
+  };
+  return -1;
+}
 
 // Dumb7Fills from chessprogrammingwiki
 bitboard FloodFillN(bitboard Pieces, bitboard Empties) {
@@ -329,21 +393,20 @@ PseudoLegalMoves(piece Piece, int PieceBoardCoord, bitboard EmptySquares) {
   } break;
   }
   return legal_moves;
-};
+}
 
 bitboard
 PseudoLegalAttacks(piece Piece, int PieceBoardCoord, bitboard Empties, bitboard EnemyOccupation) {
   bitboard legal_attacks = 0;
   bitboard p = BitboardWithBitSet(0, PieceBoardCoord);
-  
   switch (Piece) {
   case wPAWN: {
-    legal_attacks = (((p << 7) & EnemyOccupation) | // NW
-                     ((p << 9) & EnemyOccupation)); // NE
+    legal_attacks = (((p << 7) & notH & EnemyOccupation) | // NW
+                     ((p << 9) & notA & EnemyOccupation)); // NE
   } break;
   case bPAWN: {
-    legal_attacks = (((p >> 9) & EnemyOccupation) | // SW
-		     ((p >> 7) & EnemyOccupation)); // SE
+    legal_attacks = (((p >> 9) & notH & EnemyOccupation) | // SW
+		     ((p >> 7) & notA & EnemyOccupation)); // SE
   } break;
   case wBISHOP:
   case bBISHOP: {
@@ -387,42 +450,42 @@ PseudoLegalAttacks(piece Piece, int PieceBoardCoord, bitboard Empties, bitboard 
   } break;
   }
   return legal_attacks;
-};
-
-void SetBitboard(bitboard* Boards, piece Piece, int destination) {
-  if (Piece == EMPTY) { return; }
-  SetPiece(&Boards[Piece], destination);
 }
 
-void UpdateBitboard(bitboard* Boards, piece Piece, int origin, int destination) {
-  if (Piece == EMPTY) { return; }
-  MovePiece(&Boards[Piece], origin, destination);
+inline bitboard GetKnightAttacks(bitboard Knights) {
+  // This assumes maximum of 2 knights which is incorrect
+  // TODO: Change to while loop (while Knights, Knights >>= 1, etc etc)
+  int knight1_coord = BitScanReverse(Knights);
+  int knight2_coord = BitScanForward(Knights);
+  bitboard result = 0ULL;
+  if (knight1_coord > 0) { result |= (KnightMoves[knight1_coord]); }
+  if (knight2_coord > 0) { result |= (KnightMoves[knight2_coord]); }
+  return result;
 }
 
-inline void
-ToMailbox(bitboard BB, piece PieceType, mailbox* Mailbox) {
-  if (!BB) { return; }
-  for (int i = 0; i < 64; i++) {
-    if (BB & 0x1ULL) { Mailbox->Squares[i] = PieceType; }
-    BB >>= 1;
-  };
-};
+inline bitboard EnPassantAttacks(piece P, uint8 Origin, uint8 EPTarget) {
+  bitboard p  = BitboardWithBitSet(EMPTY, Origin);
+  bitboard ep = BitboardWithBitSet(EMPTY, EPTarget);
+  if (IsWhite(P)) { return ((p << 7) & notH & ep) | ((p << 9) & notA & ep); }
+  return ((p >> 9) & notH & ep) | ((p >> 7) & notA & ep);
+}
 
-inline void
-PopulateMailbox(bitboard* Bitboards, mailbox* Mailbox) {
-  *Mailbox = {};
-  ToMailbox(Bitboards[bPAWN],     bPAWN, Mailbox);
-  ToMailbox(Bitboards[bBISHOP], bBISHOP, Mailbox);
-  ToMailbox(Bitboards[bKNIGHT], bKNIGHT, Mailbox);
-  ToMailbox(Bitboards[bROOK],     bROOK, Mailbox);
-  ToMailbox(Bitboards[bQUEEN],   bQUEEN, Mailbox);
-  ToMailbox(Bitboards[bKING],     bKING, Mailbox);
-  ToMailbox(Bitboards[wPAWN],     wPAWN, Mailbox);
-  ToMailbox(Bitboards[wBISHOP], wBISHOP, Mailbox);
-  ToMailbox(Bitboards[wKNIGHT], wKNIGHT, Mailbox);
-  ToMailbox(Bitboards[wROOK],     wROOK, Mailbox);
-  ToMailbox(Bitboards[wQUEEN],   wQUEEN, Mailbox);
-  ToMailbox(Bitboards[wKING],     wKING, Mailbox);
+inline bitboard WhiteOccupation(chess_state* State) {
+  return State->Bitboards[wPAWN]   |
+         State->Bitboards[wBISHOP] |
+         State->Bitboards[wKNIGHT] |
+         State->Bitboards[wROOK]   |
+         State->Bitboards[wQUEEN]  |
+         State->Bitboards[wKING];
+}
+
+inline bitboard BlackOccupation(chess_state* State) {
+  return State->Bitboards[bPAWN]   |
+         State->Bitboards[bBISHOP] |
+         State->Bitboards[bKNIGHT] |
+         State->Bitboards[bROOK]   |
+         State->Bitboards[bQUEEN]  |
+         State->Bitboards[bKING];
 }
 
 inline bitboard
@@ -433,7 +496,56 @@ CalculateOccupation(bitboard Bitboards[]) {
          Bitboards[bPAWN]   | Bitboards[bBISHOP] |
          Bitboards[bKNIGHT] | Bitboards[bROOK] |
          Bitboards[bQUEEN]  | Bitboards[bKING];
-};
+}
+
+// King check basics are here for both colors, but I suspect they will need to change
+// before I glue things down
+inline bool32 WhiteKingIsInCheck(chess_state* State) {
+  bitboard KingPos = State->Bitboards[wKING];
+  bitboard Empties = State->Bitboards[EMPTY_SQ];
+  bitboard DiagPieces = State->Bitboards[bBISHOP] | State->Bitboards[bQUEEN];
+  bitboard NSEWPieces = State->Bitboards[bROOK] | State->Bitboards[bQUEEN];
+
+  bitboard pawns_can_check = (((State->Bitboards[bPAWN] >> 9) & notH) & KingPos) ||
+                             (((State->Bitboards[bPAWN] >> 7) & notA) & KingPos);
+  bitboard diagonal_checks = (FloodAttacksNW(DiagPieces, Empties) |
+                              FloodAttacksNE(DiagPieces, Empties) |
+                              FloodAttacksSW(DiagPieces, Empties) |
+                              FloodAttacksSE(DiagPieces, Empties)) & KingPos;
+  bitboard nsew_checks = (FloodAttacksN(NSEWPieces, Empties) |
+		          FloodAttacksS(NSEWPieces, Empties) |
+		          FloodAttacksE(NSEWPieces, Empties) |
+		          FloodAttacksW(NSEWPieces, Empties)) & KingPos;
+  bitboard knight_checks = GetKnightAttacks(State->Bitboards[bKNIGHT]) & KingPos;
+
+  return pawns_can_check || diagonal_checks || nsew_checks || knight_checks;
+}
+
+inline bool32 BlackKingIsInCheck(chess_state* State) {
+  bitboard KingPos = State->Bitboards[bKING];
+  bitboard Empties = State->Bitboards[EMPTY_SQ];
+  bitboard DiagPieces = State->Bitboards[wBISHOP] | State->Bitboards[wQUEEN];
+  bitboard NSEWPieces = State->Bitboards[wROOK] | State->Bitboards[wQUEEN];
+
+  bitboard pawns_can_check = (((State->Bitboards[wPAWN] >> 9) & notH) & KingPos) ||
+                             (((State->Bitboards[wPAWN] >> 7) & notA) & KingPos);
+  bitboard diagonal_checks = (FloodAttacksNW(DiagPieces, Empties) |
+                              FloodAttacksNE(DiagPieces, Empties) |
+                              FloodAttacksSW(DiagPieces, Empties) |
+                              FloodAttacksSE(DiagPieces, Empties)) & KingPos;
+  bitboard nsew_checks = (FloodAttacksN(NSEWPieces, Empties) |
+		          FloodAttacksS(NSEWPieces, Empties) |
+		          FloodAttacksE(NSEWPieces, Empties) |
+		          FloodAttacksW(NSEWPieces, Empties)) & KingPos;
+  bitboard knight_checks = GetKnightAttacks(State->Bitboards[wKNIGHT]) & KingPos;
+
+  return pawns_can_check || diagonal_checks || nsew_checks || knight_checks;
+}
+
+inline bool32 KingIsInCheck(chess_state* State) {
+  if (State->BoardState.WhiteToMove) { return WhiteKingIsInCheck(State); }
+  return BlackKingIsInCheck(State);
+}
 
 #define BITBOARD_H
 #endif

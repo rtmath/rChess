@@ -61,7 +61,7 @@ bool32 TEST_PopulateBoardFromFEN() {
     bROOK, bKNIGHT, bBISHOP, bQUEEN, bKING, bBISHOP, bKNIGHT, bROOK
   };
   bitboard Expected[16] = {};
-  for (int i = 0; i < 64; i++) { SetBitboard(Expected, ExpectedPieces[i], i); }
+  for (int i = 0; i < 64; i++) { SetPiece(Expected, ExpectedPieces[i], i); }
   
   bitboard Actual[16] = {};
   
@@ -269,7 +269,7 @@ bool32 TEST_FENToBitboards() {
   ExpectedState.EnPassantTarget = 0;
   ExpectedState.HalfMoves = 0;
   ExpectedState.FullMoves = 1;
-  for (int i = 0; i < 64; i++) { SetBitboard(ExpectedBitboards, ExpectedPieces[i], i); }
+  for (int i = 0; i < 64; i++) { SetPiece(ExpectedBitboards, ExpectedPieces[i], i); }
 
   ExpectedBitboards[OCCUP_SQ] = (ExpectedBitboards[wPAWN]   |
 				 ExpectedBitboards[wBISHOP] |

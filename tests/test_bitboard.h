@@ -87,5 +87,54 @@ bool32 TEST_CheckBit() {
   return result;
 }
 
+bool32 TEST_BitScanForward() {
+  bool32 result = true;
+  for (int i = 0; i < 64; i++) {
+    uint64 tester = BitboardWithBitSet(0, i);
+
+    int expected = i;
+    int actual = BitScanForward(tester);
+
+    if (expected != actual) {
+      result = false;
+      printf("TEST_BitScanForward FAILED: Expected i (%i) did not match actual i (%i)\n", expected, actual);
+    }
+  }
+  return result;
+}
+
+bool32 TEST_BitScanReverse() {
+  bool32 result = true;
+  for (int i = 0; i < 64; i++) {
+    uint64 tester = BitboardWithBitSet(0, i);
+
+    int expected = i;
+    int actual = BitScanReverse(tester);
+
+    if (expected != actual) {
+      result = false;
+      printf("TEST_BitScanReverse FAILED: Expected i (%i) did not match actual i (%i)\n", expected, actual);
+    }
+  }
+  return result;
+}
+
+bool32 TEST_PieceIsType() {
+  bool32 result = true;
+
+  piece Types[] = { PAWN, BISHOP, KNIGHT, ROOK, QUEEN, KING };
+  piece White[] = { wPAWN, wBISHOP, wKNIGHT, wROOK, wQUEEN, wKING };
+  piece Black[] = { bPAWN, bBISHOP, bKNIGHT, bROOK, bQUEEN, bKING };
+
+  for (int i = 0; i < 6; i++) {
+    bool32 actualW = PieceIsType(White[i], Types[i]);
+    bool32 actualB = PieceIsType(Black[i], Types[i]);
+    if (!actualW) { printf("TEST_PieceIsType FAILED: Expected white piece %i was not detected as type %i\n", White[i], Types[i]); result = false; }
+    if (!actualB) { printf("TEST_PieceIsType FAILED: Expected black piece %i was not detected as type %i\n", Black[i], Types[i]); result = false; }
+  }
+  
+  return result;
+}
+
 #define TEST_BITBOARD_H
 #endif
