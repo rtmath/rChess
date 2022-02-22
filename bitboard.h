@@ -41,7 +41,7 @@ inline bitboard
 ClearBit(bitboard bb, unsigned char nth_place) {
   uint64 index = 0x1;
   return (bb & ~(index << nth_place));
-};
+}
 
 inline void
 ClearBit(uint64* target, unsigned char nth_place) {
@@ -53,21 +53,22 @@ ClearBit(uint64* target, unsigned char nth_place) {
 inline void
 ToggleBit(uint64* target, unsigned char nth_place) {
   Assert(nth_place < 64);
-  uint64 index = 0x1;
-  *target ^= (index << nth_place);
+  uint64 index = 0x1;  *target ^= (index << nth_place);
 }
 
 inline bool32
 CheckBit(uint64 n, unsigned char nth_place) {
   Assert(nth_place < 64);
   return !!((n >> nth_place) & 0x1ULL);
-};
+}
 
-inline bool32 IsWhite(piece P) {
+inline bool32
+IsWhite(piece P) {
   return (P & W_MASK) > 0;
 }
 
-inline bool32 PieceIsType(piece P, piece Type) {
+inline bool32
+PieceIsType(piece P, piece Type) {
   P = P & (~W_MASK); // remove color identifier from P
   return P == (P & Type);
 }
@@ -77,8 +78,15 @@ SetPiece(bitboard* B, int destination) {
   SetBit(B, destination);
 }
 
-inline void ClearPiece(bitboard* B, int location) {
+inline void
+ClearPiece(bitboard* B, int location) {
   ClearBit(B, location);
+}
+
+inline void
+ClearPiece(bitboard* Boards, piece Piece, int location) {
+  if (Piece == EMPTY) { return; }
+  ClearBit(&Boards[Piece], location);
 }
 
 inline void
@@ -142,6 +150,17 @@ inline int BitScanReverse(bitboard B) {
     B <<= 1;
   };
   return -1;
+}
+
+uint8 PopCount(bitboard B) {
+  uint8 count = 0;
+  while (B > 0) {
+    if ((B & 0x1ULL) > 0) {
+      count++;
+    }
+    B >>= 1;
+  }
+  return count;
 }
 
 // Dumb7Fills from chessprogrammingwiki
@@ -470,44 +489,38 @@ inline bitboard EnPassantAttacks(piece P, uint8 Origin, uint8 EPTarget) {
   return ((p >> 9) & notH & ep) | ((p >> 7) & notA & ep);
 }
 
-inline bitboard WhiteOccupation(chess_state* State) {
-  return State->Bitboards[wPAWN]   |
-         State->Bitboards[wBISHOP] |
-         State->Bitboards[wKNIGHT] |
-         State->Bitboards[wROOK]   |
-         State->Bitboards[wQUEEN]  |
-         State->Bitboards[wKING];
+inline bitboard WhiteOccupation(bitboard BBs[]) {
+  return BBs[wPAWN]   |
+         BBs[wBISHOP] |
+         BBs[wKNIGHT] |
+         BBs[wROOK]   |
+         BBs[wQUEEN]  |
+         BBs[wKING];
 }
 
-inline bitboard BlackOccupation(chess_state* State) {
-  return State->Bitboards[bPAWN]   |
-         State->Bitboards[bBISHOP] |
-         State->Bitboards[bKNIGHT] |
-         State->Bitboards[bROOK]   |
-         State->Bitboards[bQUEEN]  |
-         State->Bitboards[bKING];
+inline bitboard BlackOccupation(bitboard BBs[]) {
+  return BBs[bPAWN]   |
+         BBs[bBISHOP] |
+         BBs[bKNIGHT] |
+         BBs[bROOK]   |
+         BBs[bQUEEN]  |
+         BBs[bKING];
 }
 
 inline bitboard
 CalculateOccupation(bitboard Bitboards[]) {
-  return Bitboards[wPAWN]   | Bitboards[wBISHOP] |
-         Bitboards[wKNIGHT] | Bitboards[wROOK] |
-         Bitboards[wQUEEN]  | Bitboards[wKING] |
-         Bitboards[bPAWN]   | Bitboards[bBISHOP] |
-         Bitboards[bKNIGHT] | Bitboards[bROOK] |
-         Bitboards[bQUEEN]  | Bitboards[bKING];
+  return BlackOccupation(Bitboards) | WhiteOccupation(Bitboards);
 }
 
-// King check basics are here for both colors, but I suspect they will need to change
-// before I glue things down
-inline bool32 WhiteKingIsInCheck(chess_state* State) {
+inline bool32
+WhiteKingIsInCheck(chess_state* State) {
   bitboard KingPos = State->Bitboards[wKING];
   bitboard Empties = State->Bitboards[EMPTY_SQ];
   bitboard DiagPieces = State->Bitboards[bBISHOP] | State->Bitboards[bQUEEN];
   bitboard NSEWPieces = State->Bitboards[bROOK] | State->Bitboards[bQUEEN];
 
-  bitboard pawns_can_check = (((State->Bitboards[bPAWN] >> 9) & notH) & KingPos) ||
-                             (((State->Bitboards[bPAWN] >> 7) & notA) & KingPos);
+  bitboard pawn_checks = (((State->Bitboards[bPAWN] >> 9) & notH) & KingPos) ||
+                         (((State->Bitboards[bPAWN] >> 7) & notA) & KingPos);
   bitboard diagonal_checks = (FloodAttacksNW(DiagPieces, Empties) |
                               FloodAttacksNE(DiagPieces, Empties) |
                               FloodAttacksSW(DiagPieces, Empties) |
@@ -518,17 +531,18 @@ inline bool32 WhiteKingIsInCheck(chess_state* State) {
 		          FloodAttacksW(NSEWPieces, Empties)) & KingPos;
   bitboard knight_checks = GetKnightAttacks(State->Bitboards[bKNIGHT]) & KingPos;
 
-  return pawns_can_check || diagonal_checks || nsew_checks || knight_checks;
+  return pawn_checks || diagonal_checks || nsew_checks || knight_checks;
 }
 
-inline bool32 BlackKingIsInCheck(chess_state* State) {
+inline bool32
+BlackKingIsInCheck(chess_state* State) {
   bitboard KingPos = State->Bitboards[bKING];
   bitboard Empties = State->Bitboards[EMPTY_SQ];
   bitboard DiagPieces = State->Bitboards[wBISHOP] | State->Bitboards[wQUEEN];
   bitboard NSEWPieces = State->Bitboards[wROOK] | State->Bitboards[wQUEEN];
 
-  bitboard pawns_can_check = (((State->Bitboards[wPAWN] >> 9) & notH) & KingPos) ||
-                             (((State->Bitboards[wPAWN] >> 7) & notA) & KingPos);
+  bitboard pawn_checks = (((State->Bitboards[wPAWN] >> 9) & notH) & KingPos) ||
+                         (((State->Bitboards[wPAWN] >> 7) & notA) & KingPos);
   bitboard diagonal_checks = (FloodAttacksNW(DiagPieces, Empties) |
                               FloodAttacksNE(DiagPieces, Empties) |
                               FloodAttacksSW(DiagPieces, Empties) |
@@ -539,11 +553,18 @@ inline bool32 BlackKingIsInCheck(chess_state* State) {
 		          FloodAttacksW(NSEWPieces, Empties)) & KingPos;
   bitboard knight_checks = GetKnightAttacks(State->Bitboards[wKNIGHT]) & KingPos;
 
-  return pawns_can_check || diagonal_checks || nsew_checks || knight_checks;
+  return pawn_checks || diagonal_checks || nsew_checks || knight_checks;
 }
 
-inline bool32 KingIsInCheck(chess_state* State) {
+inline bool32
+KingIsInCheck(chess_state* State) {
   if (State->BoardState.WhiteToMove) { return WhiteKingIsInCheck(State); }
+  return BlackKingIsInCheck(State);
+}
+
+inline bool32
+KingIsInCheck(chess_state* State, bool32 WhiteToMove) {
+  if (WhiteToMove) { return WhiteKingIsInCheck(State); }
   return BlackKingIsInCheck(State);
 }
 

@@ -96,16 +96,22 @@ struct mailbox {
 };
 
 struct move {
-  piece MovedPiece;
-  piece CapturedPiece;
-  piece PromotedPiece;
+  piece PieceType;
   uint8 Origin;
-  uint8 Destination;
-  uint8 EnPassantTarget;
+  uint8 Destination;  
+  piece DestPieceType;
+  uint8 DestPieceLoc;
+
+  piece PromoPieceType;
+
+  uint8 NewEPTarget;
+  uint8 PrevEPTarget;
   bool8 wLostCastleKingside;
   bool8 wLostCastleQueenside;
   bool8 bLostCastleKingside;
   bool8 bLostCastleQueenside;
+  uint8 HalfMoves;
+  uint8 FullMoves;
 };
 
 struct chess_state {
@@ -114,7 +120,7 @@ struct chess_state {
   mailbox Mailbox;
   bitboard RookAtkLookup[64];
   bitboard BishopAtkLookup[64];
-
+  
   // Input
   bool32 DragMode;
   piece DraggedPiece;
@@ -142,15 +148,35 @@ void PrintMailbox(mailbox M) {
 };
 
 void PrintMove(move M) {
-  printf("  MovedPiece %u\n",    M.MovedPiece);
-  printf("  CapturedPiece %u\n", M.CapturedPiece);
-  printf("  PromotedPiece %u\n", M.PromotedPiece);
+  printf("== MOVE ==\n");
+  printf("  PieceType %u\n",    M.PieceType);
+  printf("  DestPieceType %u\n", M.DestPieceType);
+  printf("  PromoPieceType %u\n", M.PromoPieceType);
   printf("  Origin %u\n", M.Origin);
   printf("  Destination %u\n", M.Destination);
+  printf("  NewEPTarget: %u\n", M.NewEPTarget);
+  printf("  PrevEPTarget: %u\n", M.PrevEPTarget);
   printf("  White Lost Castle K %u\n", M.wLostCastleKingside);
   printf("  White Lost Castle Q %u\n", M.wLostCastleQueenside);
   printf("  Black Lost Castle K %u\n", M.bLostCastleKingside);
   printf("  Black Lost Castle Q %u\n", M.bLostCastleQueenside);
+  printf("==========\n");
+};
+
+void PrintPiece(piece P, char Label[]) {
+  printf("  %s %s\n", Label, PieceNameLookup[P]);
+};
+
+void PrettyPrintMove(move M) {
+  printf("== MOVE ==\n");
+  printf("  Piece number: %u\n", M.PieceType);
+  PrintPiece(M.PieceType, "PieceType");
+  PrintPiece(M.DestPieceType, "DestPieceType");
+  PrintPiece(M.PromoPieceType, "PromoPieceType");
+  printf("  Origin %s\n", SquareLookup[M.Origin]);
+  printf("  Destination %s\n", SquareLookup[M.Destination]);
+
+  printf("==========\n");
 };
 
 #define RCHESS_H

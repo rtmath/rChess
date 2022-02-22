@@ -174,6 +174,25 @@ global_var char* SquareLookup[] = {
   "A8", "B8", "C8", "D8", "E8", "F8", "G8", "H8"
 };
 
+global_var char* PieceNameLookup[] = {
+  "EMPTY", 
+  "bPAWN",
+  "bBISHOP",
+  "bKNIGHT",
+  "bROOK",
+  "bQUEEN",
+  "bKING",
+  "OCCUP_SQ",
+  "EMPTY_SQ / W_MASK",
+  "wPAWN",
+  "wBISHOP",
+  "wKNIGHT",
+  "wROOK",
+  "wQUEEN",
+  "wKING",
+  "UNUSED"
+};
+
 global_var bitboard KnightMoves[64] = {
   0x0000000000020400, // A1
   0x0000000000050800, // B1

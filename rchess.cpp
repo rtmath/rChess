@@ -7,11 +7,10 @@
 #include "tests/test_bitboard.h"
 #include "tests/test_fen.h"
 
-//   En Passant
-//     ) Bug: I seem to lose EP target after undoing a move
-//     ) Bug: Undoing a move doesnt restore the captured piece after an EP capture
+// TODO: Castling | check that SideCanCastle and SquaresArentAttacked and SquaresAreEmpty
 
-inline uint8 CalculateEnPassantTarget(piece P, uint8 POrigin, uint8 PDestination) {
+inline uint8
+CalculateEnPassantTarget(piece P, uint8 POrigin, uint8 PDestination) {
   if (!(P == wPAWN || P == bPAWN)) { return 0; }
   if ((PDestination - POrigin) == 16) { return PDestination - 8; }
   if ((POrigin - PDestination) == 16) { return PDestination + 8; }
@@ -22,27 +21,84 @@ inline bool32
 WithinDims(int x, int y, dims Dims) {
   return ((x >= Dims.MinX) && (y >= Dims.MinY) &&
 	  (x <= Dims.MaxX) && (y <= Dims.MaxY));
-};
+}
 
 inline bool32
 PieceBelongsToPlayer(piece P, bool32 WhiteToMove) {
   if (P == EMPTY) { return false; }
-  return IsWhite(P) == WhiteToMove;
-};
+  return (IsWhite(P) == WhiteToMove);
+}
 
-inline uint8 Rank(int n) {
+inline uint8
+Rank(int n) {
   return n / 8;
-};
+}
 
-inline uint8 File(int n) {
+inline uint8
+File(int n) {
   return n % 8;
-};
+}
+
+inline void
+ChangeTurn(chess_state* S) {
+  S->BoardState.WhiteToMove = !(S->BoardState.WhiteToMove);
+}
+
+bitboard MovesForPieceOnSquare(piece Type, uint8 BoardCoord, bitboard Pieces[], bool32 WhiteToMove) {
+  bitboard PseudoQuiets   = PseudoLegalMoves(Type, BoardCoord, Pieces[EMPTY_SQ]);
+  bitboard PseudoAttacks  = PseudoLegalAttacks(Type, BoardCoord, Pieces[EMPTY_SQ], (WhiteToMove) ? BlackOccupation(Pieces) : WhiteOccupation(Pieces) );
+  return PseudoQuiets | PseudoAttacks;
+}
+
+inline bool32
+NotEmpty(bitboard BB) {
+  return BB > 0;
+}
+
+inline bool32
+PieceAtLowestBit(bitboard BB) {
+  return (BB & 0x1) > 0;
+}
+
+int GeneratePseudoLegalMoves(bitboard Pieces[], bool32 WhiteToMove, move Moves[], mailbox* Mailbox) {
+  int MCounter = 0;
+  for (piece P = PAWN; P <= KING; P++) {
+    piece Piece = (WhiteToMove) ? (P | W_MASK) : P;
+    bitboard BB = Pieces[Piece];
+
+    uint8 Origin = 0;
+    while (NotEmpty(BB)) {
+      if (PieceAtLowestBit(BB)) {
+	bitboard Mvs = MovesForPieceOnSquare(Piece, Origin, Pieces, WhiteToMove);
+	
+	uint8 Destination = 0;
+	while (NotEmpty(Mvs)) {
+	  if (PieceAtLowestBit(Mvs)) {
+	    move M = {};
+	    M.Origin = Origin;
+	    M.Destination = Destination;
+	    M.PieceType = Piece;
+	    M.DestPieceType = Mailbox->Squares[Destination];
+
+	    Moves[MCounter] = M;
+	    MCounter++;
+	  }
+	  Destination++;
+	  Mvs >>= 1;
+	}
+      }
+      Origin++;
+      BB >>= 1;
+    }
+  }
+  return MCounter;
+}
 
 void BeginDragMode(chess_state* State, uint8 BoardCoord) {
   State->DraggedPieceOrigin = BoardCoord;
   State->Mailbox.Squares[BoardCoord] = EMPTY;
   State->DraggedPieceLegalMoves = PseudoLegalMoves(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ]);
-  State->DraggedPieceLegalAttacks = PseudoLegalAttacks(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ], (State->BoardState.WhiteToMove) ? BlackOccupation(State) : WhiteOccupation(State) );
+  State->DraggedPieceLegalAttacks = PseudoLegalAttacks(State->DraggedPiece, BoardCoord, State->Bitboards[EMPTY_SQ], (State->BoardState.WhiteToMove) ? BlackOccupation(State->Bitboards) : WhiteOccupation(State->Bitboards) );
   uint8 EPTarget = State->BoardState.EnPassantTarget;
   bitboard EPAttacks = EnPassantAttacks(State->DraggedPiece, BoardCoord, EPTarget);
   State->DraggedPieceLegalAttacks |= EPAttacks;
@@ -125,6 +181,104 @@ inline bool32 EnPassant(uint8 Destination, uint8 EPTarget) {
   return (Destination == EPTarget) && (EPTarget != EMPTY);
 }
 
+move Move(piece Type, piece DestType, uint8 Origin, uint8 Destination) {
+  move M = {};
+  M.PieceType = Type;
+  M.DestPieceType = DestType;
+  M.Origin = Origin;
+  M.Destination = Destination;
+  return M;
+}
+
+void MakeMove(chess_state* S, move M) {
+  piece PieceType = M.PieceType;
+  int Origin = M.Origin;
+  int Destination = M.Destination;
+  piece DestPieceType = M.DestPieceType;
+  M.DestPieceLoc = Destination;
+
+  bitboard* BBs = &S->Bitboards[0];
+  
+  ClearPiece(BBs, DestPieceType, Destination);
+  MovePiece(BBs, PieceType, Origin, Destination);
+
+  int CurrentEPTarget = S->BoardState.EnPassantTarget;
+  if (EnPassant(Destination, CurrentEPTarget)) {
+    if (CurrentEPTarget > H5) {
+      M.DestPieceLoc = Destination - 8;
+      M.DestPieceType = bPAWN;
+      ClearPiece(&BBs[bPAWN], M.DestPieceLoc);
+    } else {
+      M.DestPieceLoc = Destination + 8;
+      M.DestPieceType = wPAWN;
+      ClearPiece(&BBs[wPAWN], M.DestPieceLoc);
+    }
+  }
+
+  if (Promotion(PieceType, Destination)) {
+    ClearPiece(&BBs[PieceType], Destination);
+    // For now, assume promotion will promote to Q
+    piece PromoPiece = (IsWhite(PieceType)) ? wQUEEN : bQUEEN;
+    SetPiece(&BBs[PromoPiece], Destination);
+    M.PromoPieceType = PromoPiece;
+  }
+
+  uint8 NewEPTarget = CalculateEnPassantTarget(PieceType, Origin, Destination);
+  M.PrevEPTarget = CurrentEPTarget;
+  M.NewEPTarget = NewEPTarget;
+  S->BoardState.EnPassantTarget = NewEPTarget;
+
+  //StoreMove(M);
+
+  S->Bitboards[OCCUP_SQ] = CalculateOccupation(S->Bitboards);
+  S->Bitboards[EMPTY_SQ] = ~S->Bitboards[OCCUP_SQ];
+
+  ChangeTurn(S);
+}
+
+void UnmakeMove(chess_state* S, move M) {
+  piece PieceType = M.PieceType;
+  int Origin = M.Origin;
+  int Destination = M.Destination;
+  piece DestPieceType = M.DestPieceType;
+
+  bitboard* BBs = &S->Bitboards[0];
+
+  MovePiece(BBs, PieceType, Destination, Origin); // replace the moved piece
+  SetPiece(BBs, DestPieceType, M.DestPieceLoc);   // replace a potentially capped piece
+
+  if (M.PromoPieceType != EMPTY) {
+    ClearPiece(BBs, M.PromoPieceType, M.DestPieceLoc);
+  }
+
+  S->BoardState.EnPassantTarget = M.PrevEPTarget;
+
+  S->Bitboards[OCCUP_SQ] = CalculateOccupation(S->Bitboards);
+  S->Bitboards[EMPTY_SQ] = ~S->Bitboards[OCCUP_SQ];
+
+  ChangeTurn(S);
+}
+
+uint64 Perft(chess_state* State, int depth) {
+  move MoveList[256];
+  int NMoves = 0;
+  uint64 nodes = 0;
+
+  if (depth <= 0) { return 1ULL; }
+
+  bool32 WhiteToMove = (depth % 2 == 1);
+
+  NMoves = GeneratePseudoLegalMoves(State->Bitboards, WhiteToMove, MoveList, &State->Mailbox);
+  for (int i = 0; i < NMoves; i++) {
+    MakeMove(State, MoveList[i]);
+    if (!KingIsInCheck(State, !WhiteToMove)) { // if the side that just moved isnt in check
+      nodes += Perft(State, depth - 1);
+    }
+    UnmakeMove(State, MoveList[i]);
+  }
+  return nodes;
+}
+
 extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffer) {
   Assert(sizeof(chess_state) <= Memory->BlockSize);
   chess_state* State = (chess_state*)Memory->Block;
@@ -139,19 +293,23 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
     PopulateMailbox(&State->Bitboards[0], &State->Mailbox);
 
     Memory->IsInitialized = true;
+
+    for (int i = 0; i < 4; i++) {
+      printf("Perft %i | %llu\n", i, Perft(State, i));
+    }
   }
   
   int MouseX = Input->MouseX;
   int MouseY = Input->MouseY;
   bool32 LMB_pressed = Input->Buttons[0].EndedDown && Input->Buttons[0].JustTransitioned;
   bool32 LMB_released = (!Input->Buttons[0].EndedDown) && Input->Buttons[0].JustTransitioned;
-  
+
   ClearScreen(Buffer, 0x00000000);
 
   if (LMB_pressed && WithinDims(MouseX, MouseY, State->UndoButtonDims)) {
     move M = UndoMove();
-    PrintMove(M);
-    UpdateStateFromUndo(State, M);
+    UnmakeMove(State, M);
+    PopulateMailbox(&State->Bitboards[0], &State->Mailbox);
   }
 
   if (LMB_pressed && !State->DragMode &&
@@ -175,41 +333,14 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
       int Origin = State->DraggedPieceOrigin;
       int Destination = BoardCoord;
       piece PieceAtDestination = State->Mailbox.Squares[BoardCoord];
-
-      ClearPiece(&State->Bitboards[PieceAtDestination], BoardCoord);
-      MovePiece(&State->Bitboards[State->DraggedPiece], Origin, Destination);
       
-      int EPTarget = State->BoardState.EnPassantTarget;
-      if (EnPassant(Destination, EPTarget)) {
-	if (EPTarget > H5) {
-          ClearPiece(&State->Bitboards[bPAWN], Destination - 8);
-	} else {
-	  ClearPiece(&State->Bitboards[wPAWN], Destination + 8);
-	}
+      move M = Move(State->DraggedPiece, PieceAtDestination, Origin, Destination);
+      MakeMove(State, M);
+      if (KingIsInCheck(State, !State->BoardState.WhiteToMove)) {
+        UnmakeMove(State, M);
       }
-      
-      if (Promotion(State->DraggedPiece, Destination)) {
-	ClearPiece(&State->Bitboards[State->DraggedPiece], Destination);
-        // For now, assume promotion will promote to Q
-        SetPiece( (IsWhite(State->DraggedPiece)) ? &State->Bitboards[wQUEEN] : &State->Bitboards[bQUEEN], Destination);
-      }
-
-      uint8 NewEPTarget = CalculateEnPassantTarget(State->DraggedPiece, Origin, Destination);
-      
-      move M = {};
-      M.MovedPiece = State->DraggedPiece;
-      M.CapturedPiece = PieceAtDestination;
-      M.Origin = Origin;
-      M.Destination = Destination;
-      M.EnPassantTarget = NewEPTarget;
-      StoreMove(M);
-
-      State->Bitboards[OCCUP_SQ] = CalculateOccupation(State->Bitboards);
-      State->Bitboards[EMPTY_SQ] = ~State->Bitboards[OCCUP_SQ];
       
       State->DraggedPieceOrigin = 0;
-      State->BoardState.WhiteToMove = !State->BoardState.WhiteToMove;
-      State->BoardState.EnPassantTarget = NewEPTarget;
     } else {
       ResetDraggedPiece(State);
     }
@@ -219,7 +350,7 @@ extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffe
   }
 
   DrawTexture(Buffer, State->BoardTex, State->BoardTexPxVals.CenteredX, 0, State->TextureScale);
-  DrawSquareOverlay(Buffer, State->Bitboards[EMPTY_SQ], State->TextureScale, 0x00AAAA00);
+  //DrawSquareOverlay(Buffer, State->Bitboards[EMPTY_SQ], State->TextureScale, 0x00AAAA00);
   DrawSquareOverlay(Buffer, State->DraggedPieceLegalAttacks, State->TextureScale, 0x00FF0000);
   DrawSquareOverlay(Buffer, State->DraggedPieceLegalMoves, State->TextureScale, 0x0000FF00);
 
