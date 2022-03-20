@@ -132,6 +132,9 @@ void RunTests() {
   TEST_BitScanForward();
   TEST_BitScanReverse();
   TEST_PieceIsType();
+  TEST_PopCount();
+
+  TEST_Moves();
 }
 
 void LoadTextures(chess_state* State, memory* Memory, int BufferWidth) {
@@ -279,7 +282,8 @@ uint64 Perft(chess_state* State, int depth) {
   return nodes;
 }
 
-extern "C" void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffer) {
+extern "C"
+void UpdateAndRender(input* Input, memory* Memory, back_buffer* Buffer) {
   Assert(sizeof(chess_state) <= Memory->BlockSize);
   chess_state* State = (chess_state*)Memory->Block;
   

@@ -38,6 +38,13 @@ SetBit(uint64* target, unsigned char nth_place) {
 }
 
 inline bitboard
+SetBit(bitboard BB, unsigned char nth_place) {
+  Assert(nth_place < 64);
+  uint64 index = 0x1;
+  return BB |= (index << nth_place);
+}
+
+inline bitboard
 ClearBit(bitboard bb, unsigned char nth_place) {
   uint64 index = 0x1;
   return (bb & ~(index << nth_place));
