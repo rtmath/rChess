@@ -2,18 +2,6 @@
 
 #include "../fen.h"
 
-void PrintBoardState(board_state B, char* Name) {
-  printf("|| %s\n", Name);
-  printf("  WhiteToMove: %s\n", (B.WhiteToMove) ? "true" : "false");
-  printf("  wCanCastleKingside: %u\n", B.wCanCastleKingside);
-  printf("  wCanCastleQueenside: %u\n", B.wCanCastleQueenside);
-  printf("  bCanCastleKingside: %u\n", B.bCanCastleKingside);
-  printf("  bCanCastleQueenside: %u\n", B.bCanCastleQueenside);
-  printf("  EnPassant Target Square index: %u\n", B.EnPassantTarget);
-  printf("  Half Moves: %i\n", B.HalfMoves);
-  printf("  Full Moves: %i\n", B.FullMoves);
-};
-
 bool32 Equal(board_state A, board_state B) {
   if ((A.WhiteToMove != B.WhiteToMove) ||
       (A.wCanCastleKingside != B.wCanCastleKingside) ||
