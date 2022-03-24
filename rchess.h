@@ -100,12 +100,12 @@ struct move {
   uint8 Origin;
   uint8 Destination;  
   piece DestPieceType;
-  uint8 DestPieceLoc;
-
   piece PromoPieceType;
 
   uint8 NewEPTarget;
   uint8 PrevEPTarget;
+  uint8 EPCapturedPieceLoc;
+  
   bool8 wLostCastleKingside;
   bool8 wLostCastleQueenside;
   bool8 bLostCastleKingside;
@@ -135,48 +135,6 @@ struct chess_state {
   texture Pieces[16];
   int TextureScale;
   dims UndoButtonDims;
-};
-
-void PrintMailbox(mailbox M) {
-  for (int row = 0; row < 8; row++) {
-    for (int col = 0; col < 8; col++) {
-      int i = (row * 8) + col;
-      printf("%i ", (M.Squares[i]) ? 1 : 0);
-    };
-    printf("\n");
-  };
-};
-
-void PrintMove(move M) {
-  printf("== MOVE ==\n");
-  printf("  PieceType %u\n",    M.PieceType);
-  printf("  DestPieceType %u\n", M.DestPieceType);
-  printf("  PromoPieceType %u\n", M.PromoPieceType);
-  printf("  Origin %u\n", M.Origin);
-  printf("  Destination %u\n", M.Destination);
-  printf("  NewEPTarget: %u\n", M.NewEPTarget);
-  printf("  PrevEPTarget: %u\n", M.PrevEPTarget);
-  printf("  White Lost Castle K %u\n", M.wLostCastleKingside);
-  printf("  White Lost Castle Q %u\n", M.wLostCastleQueenside);
-  printf("  Black Lost Castle K %u\n", M.bLostCastleKingside);
-  printf("  Black Lost Castle Q %u\n", M.bLostCastleQueenside);
-  printf("==========\n");
-};
-
-void PrintPiece(piece P, char Label[]) {
-  printf("  %s %s\n", Label, PieceNameLookup[P]);
-};
-
-void PrettyPrintMove(move M) {
-  printf("== MOVE ==\n");
-  printf("  Piece number: %u\n", M.PieceType);
-  PrintPiece(M.PieceType, "PieceType");
-  PrintPiece(M.DestPieceType, "DestPieceType");
-  PrintPiece(M.PromoPieceType, "PromoPieceType");
-  printf("  Origin %s\n", SquareLookup[M.Origin]);
-  printf("  Destination %s\n", SquareLookup[M.Destination]);
-
-  printf("==========\n");
 };
 
 #define RCHESS_H
